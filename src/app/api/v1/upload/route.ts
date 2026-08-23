@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { getAuthUser } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getAuthUser(req);
+    const companyName = user?.company?.name 
+      ? user.company.name.replace(/[^a-zA-Z0-9]/g, '_')
+      : 'unknown_company';
+
     const formData = await req.formData();
     const file = formData.get('file') as File;
 
@@ -28,8 +34,9 @@ export async function POST(req: NextRequest) {
     const uploadDir = path.join(process.cwd(), 'public', 'uploads');
     await fs.mkdir(uploadDir, { recursive: true });
 
-    // Generate unique name
-    const filename = `drawing-${Date.now()}${ext}`;
+    // Generate unique name: originalName_companyName.ext
+    const baseName = path.basename(file.name, ext).replace(/[^a-zA-Z0-9]/g, '_');
+    const filename = `${baseName}_${companyName}${ext}`;
     const filePath = path.join(uploadDir, filename);
 
     // Save file
