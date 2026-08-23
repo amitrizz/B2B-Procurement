@@ -6,7 +6,7 @@ import {
   Building, LogOut, CheckCircle, Clock, ShoppingCart, 
   Plus, Users, FileText, ChevronRight, Truck, Info,
   Search, ShieldAlert, Star, RefreshCw, ArrowLeft,
-  Menu, X, User
+  Menu, X, User, Loader2
 } from 'lucide-react';
 
 import MarketplaceTab from './components/MarketplaceTab';
@@ -19,6 +19,7 @@ import ProfileTab from './components/ProfileTab';
 export default function Dashboard() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [activeTab, setActiveTab] = useState('marketplace'); // marketplace, my_rfqs, my_bids, orders, admin, transporter
   const [rfqs, setRfqs] = useState<any[]>([]);
   const [marketplaceRfqs, setMarketplaceRfqs] = useState<any[]>([]);
@@ -77,13 +78,15 @@ export default function Dashboard() {
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
-    if (!storedUser) {
+    const token = localStorage.getItem('token');
+    if (!storedUser || !token) {
       router.push('/');
     } else {
       const parsed = JSON.parse(storedUser);
       setUser(parsed);
+      setCheckingAuth(false);
       // Fetch live company status
-      const headers = { 'Authorization': `Bearer ${localStorage.getItem('token')}` };
+      const headers = { 'Authorization': `Bearer ${token}` };
       fetch('/api/v1/company/me', { headers })
         .then(res => res.json())
         .then(d => {
@@ -497,7 +500,13 @@ export default function Dashboard() {
     }
   };
 
-  if (!user) return null;
+  if (checkingAuth || !user) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col md:flex-row h-screen overflow-hidden relative">

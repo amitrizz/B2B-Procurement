@@ -15,7 +15,19 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const router = useRouter();
+
+  // Route guarding: redirect to dashboard if token and user exist
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
+    if (token && storedUser) {
+      router.push('/dashboard');
+    } else {
+      setCheckingAuth(false);
+    }
+  }, [router]);
 
   // Detect resetToken in query parameters
   useEffect(() => {
@@ -122,6 +134,14 @@ export default function Home() {
       setLoading(false);
     }
   };
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-6 md:p-12 relative overflow-y-auto custom-scrollbar">
