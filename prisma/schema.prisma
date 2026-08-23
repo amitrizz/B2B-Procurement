@@ -1,0 +1,243 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Company {
+  id               String            @id @default(uuid())
+  gstin            String            @unique
+  name             String
+  status           String            @default("PENDING") // PENDING, UNDER_REVIEW, VERIFIED, REJECTED, SUSPENDED
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  users            User[]
+  addresses        CompanyAddress[]
+  documents        CompanyDocument[]
+  rfqs             RFQ[]             @relation("BuyerCompany")
+  bids             Bid[]             @relation("SupplierCompany")
+  purchaseOrdersAsBuyer    PurchaseOrder[] @relation("POBuyer")
+  purchaseOrdersAsSupplier PurchaseOrder[] @relation("POSupplier")
+  reviewsAsReviewer        Review[]        @relation("ReviewReviewer")
+  reviewsAsReviewed        Review[]        @relation("ReviewReviewed")
+}
+
+model CompanyAddress {
+  id           String    @id @default(uuid())
+  companyId    String
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  state        String
+  addressLine1 String
+  addressLine2 String?
+  city         String
+  pincode      String
+  isPrimary    Boolean   @default(false)
+  rfqs         RFQ[]
+}
+
+model CompanyDocument {
+  id           String    @id @default(uuid())
+  companyId    String
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  documentType String    // GST_CERT, PAN_CARD, INCORPORATION_PROOF, BANK_PROOF
+  fileId       String
+  verified     Boolean   @default(false)
+}
+
+model User {
+  id            String         @id @default(uuid())
+  companyId     String?
+  company       Company?       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  email         String         @unique
+  passwordHash  String
+  role          String         // OWNER, ADMIN, PROCUREMENT, FINANCE, TRANSPORTER, PLATFORM_ADMIN
+  emailVerified Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  refreshTokens RefreshToken[]
+  notifications Notification[]
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model RFQ {
+  id                   String           @id @default(uuid())
+  buyerCompanyId       String
+  buyerCompany         Company          @relation("BuyerCompany", fields: [buyerCompanyId], references: [id])
+  rfqNumber            String           @unique
+  title                String
+  description          String?
+  category             String?
+  status               String           @default("DRAFT") // DRAFT, PUBLISHED, BIDDING_OPEN, BIDDING_CLOSED, PARTIALLY_AWARDED, FULLY_AWARDED, ORDER_CREATED, CANCELLED, EXPIRED, COMPLETED
+  bidStartAt           DateTime?
+  bidEndAt             DateTime?
+  requiredDeliveryDate DateTime?
+  deliveryAddressId    String?
+  deliveryAddress      CompanyAddress?  @relation(fields: [deliveryAddressId], references: [id])
+  expectedBudget       Float?
+  version              Int              @default(0)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  items                RFQItem[]
+  bids                 Bid[]
+  purchaseOrders       PurchaseOrder[]
+}
+
+model RFQItem {
+  id                String              @id @default(uuid())
+  rfqId             String
+  rfq               RFQ                 @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  componentName     String
+  drawingFileId     String
+  drawingRevision   String?
+  quantity          Float
+  unit              String
+  specification     String?
+  hsnCode           String
+  materialOptionPreference String @default("BOTH") // BOTH, WITH_MATERIAL, WITHOUT_MATERIAL
+  expectedTimeDays             Int?
+  bids              Bid[]
+  purchaseOrderItems PurchaseOrderItem[]
+}
+
+model Bid {
+  id                     String              @id @default(uuid())
+  bidNumber              String              @unique
+  rfqId                  String
+  rfq                    RFQ                 @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  rfqItemId              String
+  rfqItem                RFQItem             @relation(fields: [rfqItemId], references: [id], onDelete: Cascade)
+  supplierCompanyId      String
+  supplierCompany        Company             @relation("SupplierCompany", fields: [supplierCompanyId], references: [id])
+  quantity               Float
+  priceWithoutMaterial   Float
+  priceWithMaterial      Float
+  materialOptionPreference String?            // WITH_MATERIAL, WITHOUT_MATERIAL
+  estimatedTimeDays      Int
+  proposedDeliveryDate   DateTime?
+  terms                  String?
+  status                 String              @default("SUBMITTED") // DRAFT, SUBMITTED, WITHDRAWN, ACCEPTED, REJECTED, EXPIRED
+  version                Int                 @default(0)
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  purchaseOrderItems     PurchaseOrderItem[]
+}
+
+model PurchaseOrder {
+  id                 String              @id @default(uuid())
+  poNumber           String              @unique
+  rfqId              String?
+  rfq                RFQ?                @relation(fields: [rfqId], references: [id])
+  buyerCompanyId     String
+  buyerCompany       Company             @relation("POBuyer", fields: [buyerCompanyId], references: [id])
+  supplierCompanyId  String
+  supplierCompany    Company             @relation("POSupplier", fields: [supplierCompanyId], references: [id])
+  status             String              @default("CREATED")
+  totalAmount        Float
+  taxAmount          Float
+  commissionAmount   Float
+  deliveryCharge     Float               @default(0)
+  version            Int                 @default(0)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  items              PurchaseOrderItem[]
+  deliveryOrder      DeliveryOrder?
+  disputes           Dispute[]
+  reviews            Review[]
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(uuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  rfqItemId       String
+  rfqItem         RFQItem       @relation(fields: [rfqItemId], references: [id])
+  bidId           String
+  bid             Bid           @relation(fields: [bidId], references: [id])
+  quantity        Float
+  unitPrice       Float
+  materialOption  String        // WITH_MATERIAL, WITHOUT_MATERIAL
+  taxRate         Float
+  taxAmount       Float
+}
+
+model Transporter {
+  id             String                @id @default(uuid())
+  name           String
+  contactPhone   String
+  serviceAreas   String?
+  vehicleTypes   String?
+  status         String                @default("PENDING") // PENDING, VERIFIED, SUSPENDED
+  bankAccountRef String?
+  createdAt      DateTime              @default(now())
+  documents      TransporterDocument[]
+  deliveries     DeliveryOrder[]
+}
+
+model TransporterDocument {
+  id            String      @id @default(uuid())
+  transporterId String
+  transporter   Transporter @relation(fields: [transporterId], references: [id], onDelete: Cascade)
+  documentType  String      // ID_PROOF, VEHICLE_RC, DRIVING_LICENSE
+  fileId        String
+  verified      Boolean     @default(false)
+}
+
+model DeliveryOrder {
+  id             String        @id @default(uuid())
+  deliveryNumber String        @unique
+  purchaseOrderId String       @unique
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  transporterId  String?
+  transporter    Transporter?  @relation(fields: [transporterId], references: [id])
+  status         String        @default("CREATED") // CREATED, ASSIGNED, ACCEPTED, ARRIVED_AT_PICKUP, PICKED_UP, IN_TRANSIT, ARRIVED_AT_DESTINATION, DELIVERED
+  deliveryCharge Float         @default(0)
+  createdAt      DateTime      @default(now())
+}
+
+model Dispute {
+  id              String        @id @default(uuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  category        String        // WRONG_PRODUCT, WRONG_QUANTITY, DAMAGED_PRODUCT, QUALITY_ISSUE, etc.
+  status          String        @default("OPEN") // OPEN, UNDER_REVIEW, WAITING_FOR_INFORMATION, RESOLVED, REJECTED, CLOSED
+  outcomeType     String?       // FULL_REFUND, PARTIAL_REFUND, REPLACEMENT, NO_ACTION, REJECTED
+  refundAmount    Float?
+  notes           String?
+  createdAt       DateTime      @default(now())
+}
+
+model Review {
+  id                String        @id @default(uuid())
+  purchaseOrderId   String
+  purchaseOrder     PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  reviewerCompanyId String
+  reviewerCompany   Company       @relation("ReviewReviewer", fields: [reviewerCompanyId], references: [id])
+  reviewedCompanyId String
+  reviewedCompany   Company       @relation("ReviewReviewed", fields: [reviewedCompanyId], references: [id])
+  rating            Int
+  comment           String?
+  createdAt         DateTime      @default(now())
+
+  @@unique([purchaseOrderId, reviewerCompanyId, reviewedCompanyId])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
