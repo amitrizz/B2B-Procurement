@@ -122,8 +122,8 @@ export async function POST(req: NextRequest, { params }: Params) {
 
         const poItemsData = itemsWon.map(item => {
           const qty = Number(item.bid.quantity);
-          const price = Number(item.selectedPrice);
-          const baseAmount = qty * price;
+          const price = Number(item.selectedPrice); // price is the total amount, not unit price
+          const baseAmount = price;
           totalBase += baseAmount;
 
           // Standard GST Rate lookup based HSN, defaulting to 18% for procurement goods
@@ -135,7 +135,7 @@ export async function POST(req: NextRequest, { params }: Params) {
             rfqItemId: item.bid.rfqItemId,
             bidId: item.bid.id,
             quantity: item.bid.quantity,
-            unitPrice: item.selectedPrice,
+            unitPrice: price / qty, // unit price is total divided by quantity
             materialOption: item.materialOption,
             taxRate,
             taxAmount,

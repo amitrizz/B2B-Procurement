@@ -147,43 +147,61 @@ export default function MyRequirementsTab({
                                 ) : (
                                   <th className="pb-2 font-semibold">Price (Without Material)</th>
                                 )}
+                                <th className="pb-2 font-semibold">Price</th>
                                 <th className="pb-2 font-semibold">Delivery Time</th>
                                 <th className="pb-2 font-semibold">Rating</th>
                                 <th className="pb-2 font-semibold text-right">Action</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {item.bids.map((bid: any) => (
-                                <tr key={bid.id} className="border-b border-white/5 text-slate-300">
-                                  <td className="py-2.5 font-medium">{bid.supplierCompany.name}</td>
-                                  {item.materialOptionPreference === 'WITH_MATERIAL' ? (
-                                    <td className="py-2.5 font-semibold text-blue-400">₹{Number(bid.priceWithMaterial).toLocaleString()}</td>
-                                  ) : (
-                                    <td className="py-2.5 font-semibold text-purple-400">₹{Number(bid.priceWithoutMaterial).toLocaleString()}</td>
-                                  )}
-                                  <td className="py-2.5">{bid.estimatedTimeDays} days</td>
-                                  <td className="py-2.5 flex items-center text-yellow-400"><Star className="w-3 h-3 fill-yellow-400 mr-1" /> 4.8</td>
-                                  <td className="py-2.5 text-right font-semibold text-xs">
-                                    {bid.status === 'ACCEPTED' ? (
-                                      <span className="text-green-400 bg-green-500/10 px-2.5 py-1.5 rounded-lg">Accepted</span>
-                                    ) : bid.status === 'REJECTED' ? (
-                                      <span className="text-red-400 bg-red-500/10 px-2.5 py-1.5 rounded-lg">Rejected</span>
+                              {item.bids.map((bid: any) => {
+                                const qty = Number(item.quantity) || 0;
+                                const totalBase = Number(item.materialOptionPreference === 'WITH_MATERIAL' ? bid.priceWithMaterial : bid.priceWithoutMaterial) || 0;
+                                const totalEstimated = totalBase * 1.23; // base + 18% tax + 5% commission
+                                const unitPrice = qty > 0 ? (totalBase / qty) : 0;
+
+                                return (
+                                  <tr key={bid.id} className="border-b border-white/5 text-slate-300">
+                                    <td className="py-2.5 font-medium">{bid.supplierCompany.name}</td>
+                                    {item.materialOptionPreference === 'WITH_MATERIAL' ? (
+                                      <td className="py-2.5 font-semibold text-blue-400">
+                                        Total: ₹{totalEstimated.toLocaleString()}
+                                        <span className="text-[10px] font-normal text-slate-500 block">
+                                          ₹{unitPrice.toLocaleString()} / unit
+                                        </span>
+                                      </td>
                                     ) : (
-                                      <button
-                                        onClick={() => handleSelectWinner(item.id, bid.id)}
-                                        className="px-3 py-1 bg-green-600/10 border border-green-500/20 text-green-400 hover:bg-green-600 hover:text-white rounded-lg text-[10px] font-bold transition-all"
-                                      >
-                                        Accept Bid
-                                      </button>
+                                      <td className="py-2.5 font-semibold text-purple-400">
+                                        Total: ₹{totalEstimated.toLocaleString()}
+                                        <span className="text-[10px] font-normal text-slate-500 block">
+                                          ₹{unitPrice.toLocaleString()} / unit
+                                        </span>
+                                      </td>
                                     )}
-                                  </td>
-                                </tr>
-                              ))}
+                                    <td className="py-2.5">{bid.estimatedTimeDays} days</td>
+                                    <td className="py-2.5 flex items-center text-yellow-400"><Star className="w-3 h-3 fill-yellow-400 mr-1" /> 4.8</td>
+                                    <td className="py-2.5 text-right font-semibold text-xs">
+                                      {bid.status === 'ACCEPTED' ? (
+                                        <span className="text-green-400 bg-green-500/10 px-2.5 py-1.5 rounded-lg">Accepted</span>
+                                      ) : bid.status === 'REJECTED' ? (
+                                        <span className="text-red-400 bg-red-500/10 px-2.5 py-1.5 rounded-lg">Rejected</span>
+                                      ) : (
+                                        <button
+                                          onClick={() => handleSelectWinner(item.id, bid.id)}
+                                          className="px-3 py-1 bg-green-600/10 border border-green-500/20 text-green-400 hover:bg-green-600 hover:text-white rounded-lg text-[10px] font-bold transition-all"
+                                        >
+                                          Accept Bid
+                                        </button>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>
                       ) : (
-                        <p className="text-xs text-slate-500">No quotes received for this component yet.</p>
+                        <div className="text-xs text-slate-600 italic">No quotes received yet.</div>
                       )}
                     </div>
                   </div>
@@ -235,40 +253,50 @@ export default function MyRequirementsTab({
           ) : myBids.length === 0 ? (
             <div className="col-span-full py-12 text-center text-slate-500 text-sm">You haven't submitted any bids/quotes yet.</div>
           ) : (
-            myBids.map((bid: any) => (
-              <div key={bid.id} className="glass-card rounded-2xl p-5 border border-white/5 flex flex-col justify-between space-y-4">
-                <div>
-                  <div className="flex justify-between items-start">
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
-                      bid.status === 'ACCEPTED' ? 'text-green-400 bg-green-500/10' : bid.status === 'REJECTED' ? 'text-red-400 bg-red-500/10' : 'text-blue-400 bg-blue-500/10'
-                    }`}>
-                      {bid.status}
-                    </span>
-                    <span className="text-[10px] text-slate-500 font-semibold">{bid.rfq?.rfqNumber}</span>
-                  </div>
-                  <h3 className="font-bold text-base text-white mt-2.5">{bid.rfq?.title}</h3>
-                  <div className="mt-4 pt-3 border-t border-white/5 space-y-1.5 text-xs text-slate-300">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[10px] text-slate-500 uppercase font-semibold">Component Bid On:</span>
-                      <span className="text-blue-400 font-semibold">{bid.rfqItem?.componentName}</span>
-                    </div>
-                    <div className="flex justify-between mt-2 pt-2 border-t border-white/5">
-                      <span className="text-slate-500">Your Quote:</span>
-                      <span className="font-bold text-slate-200">
-                        ₹{Number(bid.materialOptionPreference === 'WITH_MATERIAL' ? bid.priceWithMaterial : bid.priceWithoutMaterial).toLocaleString()}
-                        <span className="text-[10px] font-normal text-slate-500 block text-right">
-                          {bid.materialOptionPreference === 'WITH_MATERIAL' ? 'With Material' : 'Without Material'}
-                        </span>
+            myBids.map((bid: any) => {
+              const qty = Number(bid.quantity) || 0;
+              const totalBase = Number(bid.materialOptionPreference === 'WITH_MATERIAL' ? bid.priceWithMaterial : bid.priceWithoutMaterial) || 0;
+              const totalEstimated = totalBase * 1.23;
+              const unitPrice = qty > 0 ? (totalBase / qty) : 0;
+
+              return (
+                <div key={bid.id} className="glass-card rounded-2xl p-5 border border-white/5 flex flex-col justify-between space-y-4">
+                  <div>
+                    <div className="flex justify-between items-start">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                        bid.status === 'ACCEPTED' ? 'text-green-400 bg-green-500/10' : bid.status === 'REJECTED' ? 'text-red-400 bg-red-500/10' : 'text-blue-400 bg-blue-500/10'
+                      }`}>
+                        {bid.status}
                       </span>
+                      <span className="text-[10px] text-slate-500 font-semibold">{bid.rfq?.rfqNumber}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Quoted Delivery:</span>
-                      <span className="font-semibold text-slate-200">{bid.estimatedTimeDays} days</span>
+                    <h3 className="font-bold text-base text-white mt-2.5">{bid.rfq?.title}</h3>
+                    <div className="mt-4 pt-3 border-t border-white/5 space-y-1.5 text-xs text-slate-300">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[10px] text-slate-500 uppercase font-semibold">Component Bid On:</span>
+                        <span className="text-blue-400 font-semibold">{bid.rfqItem?.componentName}</span>
+                      </div>
+                      <div className="flex justify-between mt-2 pt-2 border-t border-white/5">
+                        <span className="text-slate-500">Your Quote:</span>
+                        <span className="font-bold text-slate-200">
+                          Total: ₹{totalEstimated.toLocaleString()}
+                          <span className="text-[10px] font-normal text-slate-400 block text-right">
+                            ₹{unitPrice.toLocaleString()} / unit
+                          </span>
+                          <span className="text-[9px] font-normal text-slate-500 block text-right">
+                            ({bid.materialOptionPreference === 'WITH_MATERIAL' ? 'With Material' : 'Without Material'})
+                          </span>
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Quoted Delivery:</span>
+                        <span className="font-semibold text-slate-200">{bid.estimatedTimeDays} days</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       )}
