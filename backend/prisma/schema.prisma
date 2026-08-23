@@ -5,6 +5,7 @@ datasource db {
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
 }
 
 model Company {
@@ -239,5 +240,13 @@ model Notification {
   title     String
   message   String
   read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model FileStorage {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  filename  String
+  mimeType  String
+  data      String   // Base64 encoded file content
   createdAt DateTime @default(now())
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, Sparkles, Building, User, Lock, Mail, ArrowRight, KeyRound } from 'lucide-react';
+import { Shield, Building, User, Lock, Mail, ArrowRight, KeyRound } from 'lucide-react';
 
 export default function Home() {
   const [authMode, setAuthMode] = useState<'login' | 'register' | 'forgot' | 'reset'>('login');
@@ -123,41 +123,16 @@ export default function Home() {
     }
   };
 
-  const handleQuickLogin = async (roleEmail: string, pass: string) => {
-    setLoading(true);
-    setError('');
-    setSuccessMsg('');
-    try {
-      const res = await fetch('/api/v1/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: roleEmail, password: pass }),
-      });
-      const data = await res.json();
-      if (!data.success) {
-        setError(data.message);
-      } else {
-        localStorage.setItem('user', JSON.stringify(data.data.user));
-        localStorage.setItem('token', data.data.accessToken);
-        router.push('/dashboard');
-      }
-    } catch (err) {
-      setError('Quick login failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-12 relative overflow-hidden">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-6 md:p-12 relative overflow-y-auto custom-scrollbar">
       {/* Decorative Blur Spheres */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl -z-10" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl -z-10" />
 
-      <div className="w-full max-w-4xl grid md:grid-cols-2 gap-8 glass-panel rounded-3xl p-8 shadow-2xl relative">
+      <div className="w-full max-w-4xl grid md:grid-cols-2 gap-8 glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl relative">
         
         {/* Left Side: Product Intro */}
-        <div className="flex flex-col justify-between p-4 space-y-8">
+        <div className="flex flex-col justify-center p-4 space-y-6">
           <div>
             <div className="flex items-center space-x-2 text-blue-400 font-semibold mb-6">
               <Shield className="w-6 h-6 animate-pulse" />
@@ -166,47 +141,6 @@ export default function Home() {
             <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent leading-tight">
               Component-Level Procurement.
             </h1>
-            <p className="text-slate-400 mt-4 leading-relaxed">
-              Every company is a buyer and a supplier. Publish component-level drawings, bid on specific parts, and manage secure end-to-end local shipping.
-            </p>
-          </div>
-
-          {/* Quick Demo Logins */}
-          <div className="space-y-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
-              Quick Demo Logins
-            </h3>
-            <div className="grid grid-cols-2 gap-2.5">
-              <button
-                onClick={() => handleQuickLogin('buyer@b2b.com', 'buyerpassword')}
-                className="py-2.5 px-4 text-xs font-medium rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 hover:bg-blue-500/20 transition-all text-left flex flex-col justify-between"
-              >
-                <span className="font-semibold text-[10px] uppercase text-blue-400">Buyer</span>
-                <span>Alpha Buyers</span>
-              </button>
-              <button
-                onClick={() => handleQuickLogin('supplier@b2b.com', 'supplierpassword')}
-                className="py-2.5 px-4 text-xs font-medium rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-300 hover:bg-purple-500/20 transition-all text-left flex flex-col justify-between"
-              >
-                <span className="font-semibold text-[10px] uppercase text-purple-400">Supplier</span>
-                <span>Beta Mfg</span>
-              </button>
-              <button
-                onClick={() => handleQuickLogin('admin@b2b.com', 'adminpassword')}
-                className="py-2.5 px-4 text-xs font-medium rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 hover:bg-red-500/20 transition-all text-left flex flex-col justify-between"
-              >
-                <span className="font-semibold text-[10px] uppercase text-red-400">Platform Admin</span>
-                <span>Super Admin</span>
-              </button>
-              <button
-                onClick={() => handleQuickLogin('supplier@b2b.com', 'supplierpassword')} // Transporter fallback
-                className="py-2.5 px-4 text-xs font-medium rounded-xl bg-green-500/10 border border-green-500/20 text-green-300 hover:bg-green-500/20 transition-all text-left flex flex-col justify-between"
-              >
-                <span className="font-semibold text-[10px] uppercase text-green-400">Transporter</span>
-                <span>Apex Logistics</span>
-              </button>
-            </div>
           </div>
         </div>
 
