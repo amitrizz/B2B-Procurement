@@ -31,12 +31,37 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
+    let workImageId = '';
+    try {
+      const body = await req.json();
+      workImageId = body.workImageId;
+    } catch (e) {
+      // Body might be empty or invalid JSON
+    }
+
+    if (!workImageId) {
+      return NextResponse.json(
+        { success: false, code: 'BAD_REQUEST', message: 'An image of the completed work is required to mark the order as ready for pickup' },
+        { status: 400 }
+      );
+    }
+
+    if (order.status !== 'PROCESSING_80') {
+      return NextResponse.json(
+        { success: false, code: 'INVALID_STATUS', message: 'Order must be 80% completed (PROCESSING_80) before marking ready for pickup' },
+        { status: 400 }
+      );
+    }
+
     const deliveryNumber = 'DEL-' + Math.floor(100000 + Math.random() * 900000);
 
     const result = await db.$transaction(async (tx) => {
       const updatedOrder = await tx.purchaseOrder.update({
         where: { id },
-        data: { status: 'READY_FOR_PICKUP' },
+        data: { 
+          status: 'READY_FOR_PICKUP',
+          workImageId,
+        },
       });
 
       const delivery = await tx.deliveryOrder.create({

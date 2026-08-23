@@ -438,14 +438,23 @@ export default function Dashboard() {
     }
   };
 
-  const handleReadyForPickup = async (orderId: string) => {
+  const handleReadyForPickup = async (orderId: string, workImageId: string) => {
     try {
-      const headers = { 'Authorization': `Bearer ${localStorage.getItem('token')}` };
-      const res = await fetch(`/api/v1/orders/${orderId}/ready-for-pickup`, { method: 'POST', headers });
+      const headers = { 
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      };
+      const res = await fetch(`/api/v1/orders/${orderId}/ready-for-pickup`, { 
+        method: 'POST', 
+        headers,
+        body: JSON.stringify({ workImageId })
+      });
       const d = await res.json();
       if (d.success) {
         showToast('Order status: READY FOR PICKUP. Delivery generated.', 'success');
         fetchData();
+      } else {
+        showToast(d.message || 'Action failed', 'error');
       }
     } catch (err) {
       showToast('Action failed', 'error');

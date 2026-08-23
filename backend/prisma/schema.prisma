@@ -155,6 +155,7 @@ model PurchaseOrder {
   deliveryOrder      DeliveryOrder?
   disputes           Dispute[]
   reviews            Review[]
+  workImageId        String?
 }
 
 model PurchaseOrderItem {
