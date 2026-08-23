@@ -660,11 +660,11 @@ export default function Dashboard() {
       {/* Publish RFQ Modal */}
       {showRfqModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-2xl p-6 space-y-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-white">Create B2B Procurement Requirement</h3>
+          <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-2xl p-6 flex flex-col max-h-[90vh] shadow-2xl">
+            <h3 className="text-lg font-bold text-white mb-4">Create B2B Procurement Requirement</h3>
             
-             <div className="space-y-4">
-              <div className="grid md:grid-cols-3 gap-4">
+            <div className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Requirement Title <span className="text-red-500">*</span></label>
                   <input
@@ -703,7 +703,7 @@ export default function Dashboard() {
                   placeholder="Description of specifications and standards required..."
                   value={newRfqDesc}
                   onChange={(e) => setNewRfqDesc(e.target.value)}
-                  className="w-full h-24 bg-slate-950 border border-white/10 rounded-xl p-4 text-sm text-slate-200 focus:outline-none"
+                  className="w-full h-24 bg-slate-950 border border-white/10 rounded-xl p-4 text-sm text-slate-200 focus:outline-none resize-none"
                 />
               </div>
 
@@ -711,8 +711,8 @@ export default function Dashboard() {
                 <h4 className="text-xs font-bold uppercase text-slate-400">RFQ Items (Components)</h4>
                 {newRfqItems.map((item, idx) => (
                   <div key={idx} className="p-4 bg-slate-950/50 rounded-xl border border-white/5 space-y-3">
-                    <div className="grid grid-cols-4 gap-3 items-end">
-                      <div className="col-span-2 space-y-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                      <div className="col-span-1 sm:col-span-2 space-y-1">
                         <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Component Name <span className="text-red-500">*</span></label>
                         <input
                           type="text"
@@ -742,7 +742,7 @@ export default function Dashboard() {
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Drawing File <span className="text-red-500">*</span></label>
-                        <label className="cursor-pointer bg-slate-950 border border-white/10 rounded-lg px-2 py-1.5 text-center hover:bg-slate-905 hover:border-blue-500/30 transition-all text-[11px] font-semibold text-blue-400 block truncate max-w-full">
+                        <label className="cursor-pointer bg-slate-950 border border-white/10 rounded-lg px-2 py-1.5 text-center hover:bg-slate-900 hover:border-blue-500/30 transition-all text-[11px] font-semibold text-blue-400 block truncate max-w-full">
                           {item.drawingFileId ? (item.drawingFileId.length > 15 ? item.drawingFileId.substring(0, 12) + '...' : item.drawingFileId) : 'Upload File'}
                           <input
                             type="file"
@@ -753,7 +753,7 @@ export default function Dashboard() {
                         </label>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 items-end pt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end pt-1">
                       <div className="space-y-1">
                         <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Material Sourcing Option <span className="text-red-500">*</span></label>
                         <select
@@ -790,7 +790,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
+            <div className="flex justify-end gap-3 pt-4 border-t border-white/5 mt-4">
               <button onClick={() => setShowRfqModal(false)} className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white">Cancel</button>
               <button onClick={handlePublishRfq} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold">Publish Requirement</button>
             </div>
