@@ -9,6 +9,7 @@ interface MyRequirementsTabProps {
   setShowRfqModal: (show: boolean) => void;
   handleSelectWinner: (rfqItemId: string, bidId: string) => Promise<void>;
   handleViewRfqDetails: (rfqId: string) => Promise<void>;
+  mode: 'buyer' | 'seller';
 }
 
 export default function MyRequirementsTab({
@@ -18,9 +19,11 @@ export default function MyRequirementsTab({
   fetchData,
   setShowRfqModal,
   handleSelectWinner,
-  handleViewRfqDetails
+  handleViewRfqDetails,
+  mode
 }: MyRequirementsTabProps) {
-  const [subTab, setSubTab] = useState<'buying' | 'selling'>('buying');
+  const subTab = mode === 'buyer' ? 'buying' : 'selling';
+  const [statusFilter, setStatusFilter] = useState<'open' | 'in_progress' | 'closed'>('open');
   const [myBids, setMyBids] = useState<any[]>([]);
   const [loadingBids, setLoadingBids] = useState(false);
 
@@ -41,16 +44,16 @@ export default function MyRequirementsTab({
   };
 
   useEffect(() => {
-    if (subTab === 'selling') {
+    if (mode === 'seller') {
       fetchMyBids();
     }
-  }, [subTab]);
+  }, [mode]);
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    if (subTab === 'buying') {
+    if (mode === 'buyer') {
       await fetchData();
     } else {
       await fetchMyBids();
@@ -58,16 +61,48 @@ export default function MyRequirementsTab({
     setTimeout(() => setIsRefreshing(false), 600);
   };
 
+  const filteredRfqs = rfqs.filter((rfq: any) => {
+    const status = rfq.status;
+    const isExpired = new Date(rfq.bidEndAt) < new Date();
+    
+    if (statusFilter === 'open') {
+      return (status === 'PUBLISHED' || status === 'BIDDING_OPEN' || status === 'DRAFT') && !isExpired;
+    } else if (statusFilter === 'in_progress') {
+      return status === 'PARTIALLY_AWARDED' || status === 'FULLY_AWARDED' || status === 'ORDER_CREATED';
+    } else {
+      return status === 'COMPLETED' || status === 'CANCELLED' || status === 'EXPIRED' || 
+             ((status === 'PUBLISHED' || status === 'BIDDING_OPEN') && isExpired);
+    }
+  });
+
+  const filteredBids = myBids.filter((bid: any) => {
+    const rfqStatus = bid.rfq?.status;
+    const bidStatus = bid.status;
+    const isExpired = new Date(bid.rfq?.bidEndAt) < new Date();
+    const isRfqAwarded = rfqStatus === 'PARTIALLY_AWARDED' || rfqStatus === 'FULLY_AWARDED' || rfqStatus === 'ORDER_CREATED';
+
+    if (statusFilter === 'open') {
+      return bidStatus === 'SUBMITTED' && (rfqStatus === 'PUBLISHED' || rfqStatus === 'BIDDING_OPEN') && !isExpired;
+    } else if (statusFilter === 'in_progress') {
+      return bidStatus === 'ACCEPTED' && isRfqAwarded;
+    } else {
+      return bidStatus === 'WITHDRAWN' || bidStatus === 'REJECTED' || 
+             rfqStatus === 'COMPLETED' || rfqStatus === 'CANCELLED' || rfqStatus === 'EXPIRED' ||
+             (isExpired && bidStatus === 'SUBMITTED' && !isRfqAwarded) ||
+             (isRfqAwarded && bidStatus !== 'ACCEPTED');
+    }
+  });
+
   return (
     <div className="space-y-6">
       {/* Title & Description */}
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-            {subTab === 'buying' ? 'My Requirements (Buying)' : 'My Submitted Bids (Selling)'}
+            {mode === 'buyer' ? 'My Requirements (Buying)' : 'My Submitted Bids (Selling)'}
           </h1>
           <p className="text-[11px] sm:text-xs text-slate-400">
-            {subTab === 'buying' 
+            {mode === 'buyer' 
               ? 'Create, monitor, and select winners for your component requirements' 
               : 'Monitor quotes and component bids you have submitted to other companies'}
           </p>
@@ -81,32 +116,40 @@ export default function MyRequirementsTab({
         </button>
       </div>
 
-      {/* Sub-tab selection (Placed Above Action Buttons) */}
-      <div className="flex bg-slate-900/60 p-1 rounded-xl border border-white/5 max-w-sm">
+      {/* Status Filter Sub-Tabs */}
+      <div className="flex bg-slate-900/60 p-1 rounded-xl border border-white/5 max-w-md">
         <button
-          onClick={() => { setSubTab('buying'); setSelectedRfqForDetails(null); }}
-          className={`flex-1 py-2 text-[11px] sm:text-xs font-semibold rounded-lg transition-all ${subTab === 'buying' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+          onClick={() => { setStatusFilter('open'); setSelectedRfqForDetails(null); }}
+          className={`flex-1 py-2 text-[11px] sm:text-xs font-semibold rounded-lg transition-all ${statusFilter === 'open' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
         >
-          Buying (My RFQs)
+          Open
         </button>
         <button
-          onClick={() => { setSubTab('selling'); setSelectedRfqForDetails(null); }}
-          className={`flex-1 py-2 text-[11px] sm:text-xs font-semibold rounded-lg transition-all ${subTab === 'selling' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+          onClick={() => { setStatusFilter('in_progress'); setSelectedRfqForDetails(null); }}
+          className={`flex-1 py-2 text-[11px] sm:text-xs font-semibold rounded-lg transition-all ${statusFilter === 'in_progress' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
         >
-          Selling (My Bids)
+          In Progress
+        </button>
+        <button
+          onClick={() => { setStatusFilter('closed'); setSelectedRfqForDetails(null); }}
+          className={`flex-1 py-2 text-[11px] sm:text-xs font-semibold rounded-lg transition-all ${statusFilter === 'closed' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+        >
+          Closed
         </button>
       </div>
 
       {/* Action Buttons (Placed Below Tab Bar) */}
       {subTab === 'buying' && (
         <div className="flex gap-2 w-full sm:w-auto">
-          <button
-            onClick={() => setShowRfqModal(true)}
-            className="flex-1 sm:flex-none py-2.5 px-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Publish New RFQ</span>
-          </button>
+          {statusFilter === 'open' && (
+            <button
+              onClick={() => setShowRfqModal(true)}
+              className="py-2 px-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-blue-500/10 active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Publish New RFQ</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -210,14 +253,14 @@ export default function MyRequirementsTab({
             </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {rfqs.length === 0 ? (
-                <div className="col-span-full py-12 text-center text-slate-500 text-sm">You haven't published any requirements yet.</div>
+              {filteredRfqs.length === 0 ? (
+                <div className="col-span-full py-12 text-center text-slate-500 text-sm">No requirements found matching this status.</div>
               ) : (
-                rfqs.map((rfq: any) => (
+                filteredRfqs.map((rfq: any) => (
                   <div key={rfq.id} className="glass-card rounded-2xl p-5 border border-white/5 flex flex-col justify-between space-y-4">
                     <div>
                       <div className="flex justify-between items-start">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${rfq.status === 'PUBLISHED' ? 'text-green-400 bg-green-500/10' : 'text-blue-400 bg-blue-500/10'}`}>{rfq.status}</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${rfq.status === 'PUBLISHED' || rfq.status === 'BIDDING_OPEN' ? 'text-green-400 bg-green-500/10' : 'text-blue-400 bg-blue-500/10'}`}>{rfq.status}</span>
                         <span className="text-[10px] text-slate-500 font-semibold">{rfq.rfqNumber}</span>
                       </div>
                       <h3 className="font-bold text-base text-white mt-2.5">{rfq.title}</h3>
@@ -227,13 +270,15 @@ export default function MyRequirementsTab({
                         <div>Ends: <span className="font-semibold text-slate-200">{new Date(rfq.bidEndAt).toLocaleDateString()}</span></div>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleViewRfqDetails(rfq.id)}
-                      className="w-full py-2.5 bg-blue-600/10 border border-blue-500/20 text-blue-400 hover:bg-blue-600 hover:text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
-                    >
-                      <span>Compare Bids & Select Winner</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
+                    {statusFilter === 'open' && (
+                      <button
+                        onClick={() => handleViewRfqDetails(rfq.id)}
+                        className="w-full py-2.5 bg-blue-600/10 border border-blue-500/20 text-blue-400 hover:bg-blue-600 hover:text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                      >
+                        <span>Compare Bids & Select Winner</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 ))
               )}
@@ -250,10 +295,10 @@ export default function MyRequirementsTab({
               <RefreshCw className="w-4 h-4 animate-spin text-blue-500" />
               <span>Loading submitted quotes...</span>
             </div>
-          ) : myBids.length === 0 ? (
-            <div className="col-span-full py-12 text-center text-slate-500 text-sm">You haven't submitted any bids/quotes yet.</div>
+          ) : filteredBids.length === 0 ? (
+            <div className="col-span-full py-12 text-center text-slate-500 text-sm">No bids found matching this status.</div>
           ) : (
-            myBids.map((bid: any) => {
+            filteredBids.map((bid: any) => {
               const qty = Number(bid.quantity) || 0;
               const totalBase = Number(bid.materialOptionPreference === 'WITH_MATERIAL' ? bid.priceWithMaterial : bid.priceWithoutMaterial) || 0;
               const totalEstimated = totalBase * 1.23;

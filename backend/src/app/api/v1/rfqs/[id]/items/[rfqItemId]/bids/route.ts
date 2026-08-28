@@ -13,7 +13,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     if (user.company.status !== 'VERIFIED') {
       return NextResponse.json(
-        { success: false, code: 'UNVERIFIED_COMPANY', message: 'Only verified companies can submit bids' },
+        { success: false, code: 'UNVERIFIED_COMPANY', message: 'You are not allowed to bid due to pending verification documentation' },
         { status: 403 }
       );
     }

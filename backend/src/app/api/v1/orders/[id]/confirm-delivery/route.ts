@@ -36,6 +36,19 @@ export async function POST(req: NextRequest, { params }: Params) {
       data: { status: 'COMPLETED' },
     });
 
+    if (updatedOrder.rfqId) {
+      const rfqOrders = await db.purchaseOrder.findMany({
+        where: { rfqId: updatedOrder.rfqId }
+      });
+      const allCompleted = rfqOrders.every(o => o.status === 'COMPLETED');
+      if (allCompleted) {
+        await db.rFQ.update({
+          where: { id: updatedOrder.rfqId },
+          data: { status: 'COMPLETED' }
+        });
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Delivery confirmed and order completed',

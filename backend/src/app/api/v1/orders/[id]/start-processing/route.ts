@@ -12,6 +12,14 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!user || !user.companyId) return authErrorResponse();
 
     const { id } = await params;
+    const { workImageId } = await req.json();
+
+    if (!workImageId) {
+      return NextResponse.json(
+        { success: false, code: 'MISSING_IMAGE', message: 'Please upload a proof of work image for this milestone.' },
+        { status: 400 }
+      );
+    }
 
     const order = await db.purchaseOrder.findUnique({
       where: { id },
@@ -40,14 +48,40 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     let nextStatus = 'PROCESSING_20';
-    if (order.status === 'PROCESSING_20') nextStatus = 'PROCESSING_40';
-    else if (order.status === 'PROCESSING_40') nextStatus = 'PROCESSING_60';
-    else if (order.status === 'PROCESSING_60') nextStatus = 'PROCESSING_80';
+    let updateData: any = {};
+
+    if (order.status === 'CREATED') {
+      nextStatus = 'PROCESSING_20';
+      updateData.workImage20 = workImageId;
+    } else if (order.status === 'PROCESSING_20') {
+      nextStatus = 'PROCESSING_40';
+      updateData.workImage40 = workImageId;
+    } else if (order.status === 'PROCESSING_40') {
+      nextStatus = 'PROCESSING_60';
+      updateData.workImage60 = workImageId;
+    } else if (order.status === 'PROCESSING_60') {
+      nextStatus = 'PROCESSING_80';
+      updateData.workImage80 = workImageId;
+    }
+
+    updateData.status = nextStatus;
+
+    console.log('[START-PROCESSING] Updating order:', id, 'with data:', JSON.stringify(updateData));
 
     const updatedOrder = await db.purchaseOrder.update({
       where: { id },
-      data: { status: nextStatus },
+      data: updateData,
     });
+
+    console.log('[START-PROCESSING] Updated order result:', JSON.stringify({
+      id: updatedOrder.id,
+      status: updatedOrder.status,
+      workImage20: updatedOrder.workImage20,
+      workImage40: updatedOrder.workImage40,
+      workImage60: updatedOrder.workImage60,
+      workImage80: updatedOrder.workImage80,
+      workImageId: updatedOrder.workImageId,
+    }));
 
     return NextResponse.json({
       success: true,

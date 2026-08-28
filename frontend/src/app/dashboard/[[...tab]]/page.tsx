@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { 
   Building, LogOut, CheckCircle, Clock, ShoppingCart, 
   Plus, Users, FileText, ChevronRight, Truck, Info,
@@ -9,18 +9,41 @@ import {
   Menu, X, User, Loader2
 } from 'lucide-react';
 
-import MarketplaceTab from './components/MarketplaceTab';
-import MyRequirementsTab from './components/MyRequirementsTab';
-import PurchaseOrdersTab from './components/PurchaseOrdersTab';
-import LocalDeliveryTab from './components/LocalDeliveryTab';
-import AdminTab from './components/AdminTab';
-import ProfileTab from './components/ProfileTab';
+import MarketplaceTab from '../components/MarketplaceTab';
+import MyRequirementsTab from '../components/MyRequirementsTab';
+import PurchaseOrdersTab from '../components/PurchaseOrdersTab';
+import LocalDeliveryTab from '../components/LocalDeliveryTab';
+import AdminTab from '../components/AdminTab';
+import ProfileTab from '../components/ProfileTab';
 
 export default function Dashboard() {
   const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const [activeTab, setActiveTab] = useState('marketplace'); // marketplace, my_rfqs, my_bids, orders, admin, transporter
+
+  // Extract active tab state from path segments
+  const pathParts = pathname.split('/').filter(Boolean);
+  const pathSegment = pathParts[0]; // First segment of the path (e.g. "orders")
+  
+  let tabName = pathSegment;
+  if (pathSegment === 'dashboard') {
+    tabName = pathParts[1] || 'marketplace';
+  }
+
+  let activeTab = 'marketplace';
+  if (tabName === 'rfqs') activeTab = 'my_rfqs';
+  else if (tabName === 'delivery') activeTab = 'transporter';
+  else if (tabName) activeTab = tabName;
+
+  const handleTabChange = (tab: string) => {
+    let route = '/marketplace';
+    if (tab === 'my_rfqs') route = '/rfqs';
+    else if (tab === 'transporter') route = '/delivery';
+    else if (tab !== 'marketplace') route = `/${tab}`;
+    router.push(route);
+  };
+
   const [rfqs, setRfqs] = useState<any[]>([]);
   const [marketplaceRfqs, setMarketplaceRfqs] = useState<any[]>([]);
   const [myBids, setMyBids] = useState<any[]>([]);
@@ -52,6 +75,7 @@ export default function Dashboard() {
   const [msg, setMsg] = useState({ type: '', text: '' });
   const [toasts, setToasts] = useState<{ id: string; type: 'success' | 'error' | 'info'; text: string }[]>([]);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const [mode, setMode] = useState<'buyer' | 'seller'>('buyer');
 
   const showToast = (text: string, type: 'success' | 'error' | 'info' = 'info') => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -104,7 +128,7 @@ export default function Dashboard() {
     if (user) {
       fetchData();
     }
-  }, [user?.company?.status, activeTab]);
+  }, [user?.company?.status, activeTab, mode]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -427,14 +451,23 @@ export default function Dashboard() {
   };
 
   // Order Actions
-  const handleStartProcessing = async (orderId: string) => {
+  const handleStartProcessing = async (orderId: string, workImageId: string) => {
     try {
-      const headers = { 'Authorization': `Bearer ${localStorage.getItem('token')}` };
-      const res = await fetch(`/api/v1/orders/${orderId}/start-processing`, { method: 'POST', headers });
+      const headers = { 
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      };
+      const res = await fetch(`/api/v1/orders/${orderId}/start-processing`, { 
+        method: 'POST', 
+        headers,
+        body: JSON.stringify({ workImageId })
+      });
       const d = await res.json();
       if (d.success) {
-        showToast('Order status: PROCESSING', 'success');
+        showToast('Order status progressed successfully', 'success');
         fetchData();
+      } else {
+        showToast(d.message || 'Action failed', 'error');
       }
     } catch (err) {
       showToast('Action failed', 'error');
@@ -511,18 +544,36 @@ export default function Dashboard() {
   return (
     <div className="flex-1 flex flex-col md:flex-row h-screen overflow-hidden relative">
       {/* Mobile Top Header */}
-      <div className="md:hidden bg-slate-900 border-b border-white/5 px-6 py-4 flex items-center justify-between z-40">
-        <div className="flex items-center space-x-2">
-          <Building className="w-5 h-5 text-blue-500" />
-          <span className="font-extrabold text-xs text-white uppercase tracking-wider">{user.company?.name || 'Platform Admin'}</span>
+      <div className="md:hidden bg-slate-900 border-b border-white/5 px-6 py-4 flex flex-col space-y-3 z-40">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Building className="w-5 h-5 text-blue-500" />
+            <span className="font-extrabold text-xs text-white uppercase tracking-wider">{user.company?.name || 'Platform Admin'}</span>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="py-1 px-2.5 bg-red-500/10 border border-red-500/20 hover:bg-red-600 hover:text-white text-red-400 rounded-lg text-[10px] font-semibold flex items-center gap-1 transition-all"
+          >
+            <LogOut className="w-3 h-3" />
+            <span>Sign Out</span>
+          </button>
         </div>
-        <button
-          onClick={handleLogout}
-          className="py-1.5 px-3 bg-red-500/10 border border-red-500/20 hover:bg-red-600 hover:text-white text-red-400 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all"
-        >
-          <LogOut className="w-3.5 h-3.5" />
-          <span>Sign Out</span>
-        </button>
+
+        {/* Global Mode Toggle Switch */}
+        <div className="bg-slate-950 p-1 rounded-xl border border-white/5 flex w-full">
+          <button
+            onClick={() => setMode('buyer')}
+            className={`flex-1 py-1 rounded-lg text-[11px] font-bold text-center transition-all ${mode === 'buyer' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}
+          >
+            Procure Mode
+          </button>
+          <button
+            onClick={() => setMode('seller')}
+            className={`flex-1 py-1 rounded-lg text-[11px] font-bold text-center transition-all ${mode === 'seller' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}
+          >
+            Supply Mode
+          </button>
+        </div>
       </div>
 
       {/* Sidebar Navigation (Desktop only) */}
@@ -542,39 +593,53 @@ export default function Dashboard() {
 
           <div className="space-y-1">
             <button
-              onClick={() => setActiveTab('marketplace')}
+              onClick={() => handleTabChange('marketplace')}
               className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'marketplace' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
             >
               <Search className="w-4 h-4" />
               <span>Public Marketplace</span>
             </button>
+
+            {mode === 'seller' && (
+              <button
+                onClick={() => handleTabChange('my_rfqs')}
+                className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'my_rfqs' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
+              >
+                <FileText className="w-4 h-4" />
+                <span>My Submitted Bids</span>
+              </button>
+            )}
             
-            <button
-              onClick={() => setActiveTab('my_rfqs')}
-              className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'my_rfqs' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
-            >
-              <FileText className="w-4 h-4" />
-              <span>My Requirements</span>
-            </button>
+            {mode === 'buyer' && (
+              <button
+                onClick={() => handleTabChange('my_rfqs')}
+                className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'my_rfqs' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
+              >
+                <FileText className="w-4 h-4" />
+                <span>My Requirements</span>
+              </button>
+            )}
 
             <button
-              onClick={() => setActiveTab('orders')}
+              onClick={() => handleTabChange('orders')}
               className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'orders' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
             >
               <ShoppingCart className="w-4 h-4" />
               <span>Purchase Orders</span>
             </button>
 
-            <button
-              onClick={() => setActiveTab('transporter')}
-              className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'transporter' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
-            >
-              <Truck className="w-4 h-4" />
-              <span>Local Delivery Portal</span>
-            </button>
+            {user.role === 'PLATFORM_ADMIN' && (
+              <button
+                onClick={() => handleTabChange('transporter')}
+                className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'transporter' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
+              >
+                <Truck className="w-4 h-4" />
+                <span>Local Delivery Portal</span>
+              </button>
+            )}
 
             <button
-              onClick={() => setActiveTab('profile')}
+              onClick={() => handleTabChange('profile')}
               className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'profile' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
             >
               <User className="w-4 h-4" />
@@ -583,7 +648,7 @@ export default function Dashboard() {
 
             {user.role === 'PLATFORM_ADMIN' && (
               <button
-                onClick={() => setActiveTab('admin')}
+                onClick={() => handleTabChange('admin')}
                 className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'admin' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
               >
                 <Users className="w-4 h-4" />
@@ -605,6 +670,30 @@ export default function Dashboard() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-y-auto bg-slate-950 p-6 md:p-10 pb-24 md:pb-10">
         
+        {/* Top Header Bar for Desktop */}
+        <div className="hidden md:flex justify-between items-center pb-6 border-b border-white/5 mb-6">
+          <div>
+            <h2 className="text-xl font-bold text-white">Dashboard Portal</h2>
+            <p className="text-xs text-slate-400">Manage your requirements, quotes, and manufacturing milestones.</p>
+          </div>
+
+          {/* Global Mode Switcher in Header */}
+          <div className="bg-slate-900 border border-white/5 p-1 rounded-xl flex w-64">
+            <button
+              onClick={() => setMode('buyer')}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-bold text-center transition-all ${mode === 'buyer' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              Procure Mode
+            </button>
+            <button
+              onClick={() => setMode('seller')}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-bold text-center transition-all ${mode === 'seller' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              Supply Mode
+            </button>
+          </div>
+        </div>
+
         {msg.text && (
           <div className={`p-4 mb-6 rounded-xl border text-sm flex items-center justify-between ${msg.type === 'success' ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
             <span>{msg.text}</span>
@@ -624,6 +713,10 @@ export default function Dashboard() {
             handleSubmitBid={handleSubmitBid}
             handleWithdrawBid={handleWithdrawBid}
             fetchData={fetchData}
+            mode={mode}
+            user={user}
+            setActiveTab={handleTabChange}
+            setSelectedRfqForDetails={setSelectedRfqForDetails}
           />
         )}
 
@@ -636,6 +729,7 @@ export default function Dashboard() {
             setShowRfqModal={setShowRfqModal}
             handleSelectWinner={handleSelectWinner}
             handleViewRfqDetails={handleViewRfqDetails}
+            mode={mode}
           />
         )}
 
@@ -646,10 +740,11 @@ export default function Dashboard() {
             handleStartProcessing={handleStartProcessing}
             handleReadyForPickup={handleReadyForPickup}
             handleConfirmDelivery={handleConfirmDelivery}
+            mode={mode}
           />
         )}
 
-        {activeTab === 'transporter' && (
+        {activeTab === 'transporter' && user?.role === 'PLATFORM_ADMIN' && (
           <LocalDeliveryTab
             deliveries={deliveries}
             fetchData={fetchData}
@@ -835,50 +930,52 @@ export default function Dashboard() {
       </div>
 
       {/* Mobile Bottom Navigation Bar */}
-      <div className={`md:hidden fixed bottom-0 left-0 right-0 bg-slate-905/98 backdrop-blur-md border-t border-white/5 z-40 grid ${user.role === 'PLATFORM_ADMIN' ? 'grid-cols-6' : 'grid-cols-5'} py-2 px-1`}>
+      <div className={`md:hidden fixed bottom-0 left-0 right-0 bg-slate-905/98 backdrop-blur-md border-t border-white/5 z-40 grid ${user.role === 'PLATFORM_ADMIN' ? 'grid-cols-6' : 'grid-cols-4'} py-2 px-1`}>
         <button 
-          onClick={() => setActiveTab('marketplace')} 
+          onClick={() => handleTabChange('marketplace')} 
           className={`flex flex-col items-center justify-center py-1 text-[9px] font-semibold transition-all ${activeTab === 'marketplace' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
         >
           <Search className="w-4 h-4 mb-0.5" />
           <span className="truncate">Market</span>
         </button>
         <button 
-          onClick={() => setActiveTab('my_rfqs')} 
+          onClick={() => handleTabChange('my_rfqs')} 
           className={`flex flex-col items-center justify-center py-1 text-[9px] font-semibold transition-all ${activeTab === 'my_rfqs' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
         >
           <FileText className="w-4 h-4 mb-0.5" />
           <span className="truncate">Reqs</span>
         </button>
         <button 
-          onClick={() => setActiveTab('orders')} 
+          onClick={() => handleTabChange('orders')} 
           className={`flex flex-col items-center justify-center py-1 text-[9px] font-semibold transition-all ${activeTab === 'orders' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
         >
           <ShoppingCart className="w-4 h-4 mb-0.5" />
           <span className="truncate">Orders</span>
         </button>
         <button 
-          onClick={() => setActiveTab('transporter')} 
-          className={`flex flex-col items-center justify-center py-1 text-[9px] font-semibold transition-all ${activeTab === 'transporter' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
-        >
-          <Truck className="w-4 h-4 mb-0.5" />
-          <span className="truncate">Delivery</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('profile')} 
+          onClick={() => handleTabChange('profile')} 
           className={`flex flex-col items-center justify-center py-1 text-[9px] font-semibold transition-all ${activeTab === 'profile' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
         >
           <User className="w-4 h-4 mb-0.5" />
           <span className="truncate">Profile</span>
         </button>
         {user.role === 'PLATFORM_ADMIN' && (
-          <button 
-            onClick={() => setActiveTab('admin')} 
-            className={`flex flex-col items-center justify-center py-1 text-[9px] font-semibold transition-all ${activeTab === 'admin' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
-          >
-            <Users className="w-4 h-4 mb-0.5" />
-            <span className="truncate">Admin</span>
-          </button>
+          <>
+            <button 
+              onClick={() => handleTabChange('transporter')} 
+              className={`flex flex-col items-center justify-center py-1 text-[9px] font-semibold transition-all ${activeTab === 'transporter' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
+            >
+              <Truck className="w-4 h-4 mb-0.5" />
+              <span className="truncate">Delivery</span>
+            </button>
+            <button 
+              onClick={() => handleTabChange('admin')} 
+              className={`flex flex-col items-center justify-center py-1 text-[9px] font-semibold transition-all ${activeTab === 'admin' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
+            >
+              <Users className="w-4 h-4 mb-0.5" />
+              <span className="truncate">Admin</span>
+            </button>
+          </>
         )}
       </div>
 

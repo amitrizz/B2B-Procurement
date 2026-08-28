@@ -156,6 +156,10 @@ model PurchaseOrder {
   disputes           Dispute[]
   reviews            Review[]
   workImageId        String?
+  workImage20        String?
+  workImage40        String?
+  workImage60        String?
+  workImage80        String?
 }
 
 model PurchaseOrderItem {

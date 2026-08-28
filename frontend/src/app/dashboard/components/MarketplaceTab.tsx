@@ -10,6 +10,10 @@ interface MarketplaceTabProps {
   handleSubmitBid: (rfqItemId: string) => Promise<void>;
   handleWithdrawBid: (rfqItemId: string) => Promise<void>;
   fetchData: () => Promise<void>;
+  mode: 'buyer' | 'seller';
+  user: any;
+  setActiveTab: (tab: string) => void;
+  setSelectedRfqForDetails: (rfq: any) => void;
 }
 
 export default function MarketplaceTab({
@@ -21,14 +25,45 @@ export default function MarketplaceTab({
   handleStartBidding,
   handleSubmitBid,
   handleWithdrawBid,
-  fetchData
+  fetchData,
+  mode,
+  user,
+  setActiveTab,
+  setSelectedRfqForDetails
 }: MarketplaceTabProps) {
+
+  const filteredRfqs = marketplaceRfqs.filter((rfq: any) => {
+    if (mode === 'buyer') {
+      return rfq.buyerCompanyId === user?.companyId;
+    } else {
+      return rfq.buyerCompanyId !== user?.companyId;
+    }
+  });
+
+  const handleManageRfq = async (rfq: any) => {
+    try {
+      const headers = { 'Authorization': `Bearer ${localStorage.getItem('token')}` };
+      const res = await fetch(`/api/v1/rfqs/${rfq.id}`, { headers });
+      const d = await res.json();
+      if (d.success) {
+        setSelectedRfqForDetails(d.data);
+        setActiveTab('my_rfqs');
+      }
+    } catch (err) {
+      console.error('Failed to load RFQ details', err);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Public B2B Marketplace</h1>
-          <p className="text-xs text-slate-400">Quote on open procurement requirements from other companies</p>
+          <h1 className="text-2xl font-bold tracking-tight text-white">
+            {mode === 'buyer' ? 'My RFQs & Procurement' : 'Public B2B Marketplace'}
+          </h1>
+          <p className="text-xs text-slate-400">
+            {mode === 'buyer' ? 'Track bids received and award winner contracts' : 'Quote on open procurement requirements from other companies'}
+          </p>
         </div>
         <button onClick={fetchData} className="p-2 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all">
           <RefreshCw className="w-4 h-4 text-slate-300" />
@@ -107,21 +142,32 @@ export default function MarketplaceTab({
                       </div>
                     )}
                   </div>
-                  {new Date(selectedRfqForBidding.bidEndAt) < new Date() ? (
-                    <div className="w-full py-2.5 bg-slate-800/50 text-slate-500 border border-white/5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center cursor-not-allowed">
-                      Bidding Closed
-                    </div>
-                  ) : item.bids && item.bids.length > 0 ? (
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Estimated Lead Time (Days)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 14"
+                      value={bidInputs[item.id]?.leadTime || ''}
+                      onChange={(e) => {
+                        setBidInputs({
+                          ...bidInputs,
+                          [item.id]: { ...(bidInputs[item.id] || {}), leadTime: Number(e.target.value) }
+                        });
+                      }}
+                      className="w-full bg-slate-900/60 border border-white/10 focus:border-blue-500/70 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none transition-all placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  </div>
+                  {item.bids && item.bids.length > 0 ? (
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleSubmitBid(item.id)}
-                        className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-extrabold uppercase tracking-wider py-2.5 rounded-xl transition-all duration-300 transform active:scale-95 shadow-lg shadow-blue-500/10 hover:shadow-blue-500/25 flex items-center justify-center gap-2"
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold uppercase tracking-wider py-2.5 rounded-xl transition-all duration-300 transform active:scale-95 shadow-lg shadow-blue-500/10 hover:shadow-blue-500/25 flex items-center justify-center gap-2"
                       >
-                        Update Bid Quote
+                        Update Quote
                       </button>
                       <button
                         onClick={() => handleWithdrawBid(item.id)}
-                        className="px-4 bg-red-600/10 border border-red-500/20 text-red-400 hover:bg-red-600 hover:text-white text-xs font-extrabold uppercase tracking-wider py-2.5 rounded-xl transition-all duration-300 transform active:scale-95 flex items-center justify-center"
+                        className="px-4 py-2.5 bg-red-600/10 border border-red-500/20 hover:bg-red-600 text-red-400 hover:text-white text-xs font-bold rounded-xl transition-all duration-300 transform active:scale-95"
                       >
                         Withdraw
                       </button>
@@ -141,10 +187,12 @@ export default function MarketplaceTab({
         </div>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {marketplaceRfqs.length === 0 ? (
-            <div className="col-span-full py-12 text-center text-slate-500 text-sm">No marketplace requirements open at the moment.</div>
+          {filteredRfqs.length === 0 ? (
+            <div className="col-span-full py-12 text-center text-slate-500 text-sm">
+              {mode === 'buyer' ? 'You have not published any requirements yet.' : 'No marketplace requirements open at the moment.'}
+            </div>
           ) : (
-            marketplaceRfqs.map((rfq: any) => (
+            filteredRfqs.map((rfq: any) => (
               <div key={rfq.id} className="glass-card rounded-2xl p-5 border border-white/5 flex flex-col justify-between space-y-4">
                 <div>
                   <div className="flex justify-between items-start">
@@ -170,7 +218,15 @@ export default function MarketplaceTab({
                     </div>
                   </div>
                 </div>
-                {new Date(rfq.bidEndAt) < new Date() ? (
+                {mode === 'buyer' ? (
+                  <button
+                    onClick={() => handleManageRfq(rfq)}
+                    className="w-full py-2.5 bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-slate-200 hover:text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                  >
+                    <span>Manage RFQ & Bids</span>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                  </button>
+                ) : new Date(rfq.bidEndAt) < new Date() ? (
                   <div className="w-full py-2.5 bg-slate-800 text-slate-500 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 cursor-not-allowed">
                     <span>Bidding Closed</span>
                   </div>
