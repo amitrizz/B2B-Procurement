@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { 
   Building, LogOut, CheckCircle, Clock, ShoppingCart, 
@@ -187,21 +187,83 @@ export default function Dashboard() {
     }
   }, [router]);
 
+  const fetchDataRef = useRef<(isBackground?: boolean) => Promise<void>>(null as any);
+  useEffect(() => {
+    fetchDataRef.current = fetchData;
+  });
+
   useEffect(() => {
     if (user) {
       fetchData();
     }
   }, [user?.company?.status, activeTab, mode]);
 
-  const fetchData = async () => {
-    setLoading(true);
+  // Real-time SSE connection & Push Notifications setup
+  useEffect(() => {
+    if (!user || !user.companyId) return;
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    // 1. Setup Server-Sent Events (SSE)
+    const sseUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL || ''}/api/v1/events?token=${token}`;
+    const eventSource = new EventSource(sseUrl);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        // If we receive ANY event, we refresh data to keep the UI perfectly in sync
+        if (data.type) {
+          if (fetchDataRef.current) fetchDataRef.current(true);
+        }
+      } catch (e) {
+        console.error('SSE parsing error', e);
+      }
+    };
+
+      // Handle client disconnects to prevent memory leaks
+      eventSource.onerror = (error) => {
+        console.error('SSE error:', error);
+        eventSource.close();
+      };
+    // 2. Setup Web Push Notifications
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      navigator.serviceWorker.register('/sw.js').then((registration) => {
+        Notification.requestPermission().then((permission) => {
+          if (permission === 'granted') {
+            const applicationServerKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+            registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey
+            }).then((subscription) => {
+              fetch('/api/v1/notifications/subscribe', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(subscription)
+              }).catch(err => console.error('Failed to save push subscription', err));
+            });
+          }
+        });
+      });
+    }
+
+    return () => {
+      if (eventSource) eventSource.close();
+    };
+  }, [user?.companyId]);
+
+  const fetchData = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
       const headers = { 'Authorization': `Bearer ${localStorage.getItem('token')}` };
+      const fetchOpts: RequestInit = { headers, cache: 'no-store' };
       
       // Pull live company details to keep UI state in sync
       if (user?.companyId) {
         try {
-          const resCompany = await fetch('/api/v1/company/me', { headers });
+          const resCompany = await fetch(`/api/v1/company/me?_t=${Date.now()}`, fetchOpts);
           const dCompany = await resCompany.json();
           if (dCompany.success && dCompany.data) {
             setUser((prev: any) => {
@@ -217,20 +279,20 @@ export default function Dashboard() {
       }
 
       if (activeTab === 'marketplace') {
-        const res = await fetch('/api/v1/marketplace/requirements', { headers });
+        const res = await fetch(`/api/v1/marketplace/requirements?_t=${Date.now()}`, fetchOpts);
         const d = await res.json();
         if (d.success) setMarketplaceRfqs(d.data);
       }
       
       if (activeTab === 'my_rfqs') {
-        const res = await fetch('/api/v1/rfqs', { headers });
+        const res = await fetch(`/api/v1/rfqs?_t=${Date.now()}`, fetchOpts);
         const d = await res.json();
         if (d.success) setRfqs(d.data);
       }
 
       if (activeTab === 'orders') {
-        const resBuying = await fetch('/api/v1/orders?type=buying', { headers });
-        const resSelling = await fetch('/api/v1/orders?type=selling', { headers });
+        const resBuying = await fetch(`/api/v1/orders?type=buying&_t=${Date.now()}`, fetchOpts);
+        const resSelling = await fetch(`/api/v1/orders?type=selling&_t=${Date.now()}`, fetchOpts);
         const dBuying = await resBuying.json();
         const dSelling = await resSelling.json();
         
@@ -242,23 +304,23 @@ export default function Dashboard() {
       }
 
       if (activeTab === 'admin' && user?.role === 'PLATFORM_ADMIN') {
-        const res = await fetch('/api/v1/admin/companies', { headers });
+        const res = await fetch(`/api/v1/admin/companies?_t=${Date.now()}`, fetchOpts);
         const d = await res.json();
         if (d.success) setAdminCompanies(d.data);
 
-        const resPay = await fetch('/api/v1/admin/payments', { headers });
+        const resPay = await fetch(`/api/v1/admin/payments?_t=${Date.now()}`, fetchOpts);
         const dPay = await resPay.json();
         if (dPay.success) setAdminPayments(dPay.data);
       }
 
       if (activeTab === 'admin_users' && user?.role === 'PLATFORM_ADMIN') {
-        const res = await fetch('/api/v1/admin/users', { headers });
+        const res = await fetch(`/api/v1/admin/users?_t=${Date.now()}`, fetchOpts);
         const d = await res.json();
         if (d.success) setAdminUsers(d.data);
       }
 
       if (activeTab === 'transporter') {
-        const res = await fetch('/api/v1/transporter/deliveries', { headers });
+        const res = await fetch(`/api/v1/transporter/deliveries?_t=${Date.now()}`, fetchOpts);
         const d = await res.json();
         if (d.success) setDeliveries(d.data);
       }
@@ -285,9 +347,9 @@ export default function Dashboard() {
         if (d.success) setCatalogItems(d.data);
       }
     } catch (err) {
-      console.error(err);
+      console.error('Error fetching data:', err);
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 

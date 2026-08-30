@@ -53,6 +53,11 @@ export async function POST(
     
     const updatedPr = updatedPrDoc ? { ...updatedPrDoc, id: updatedPrDoc._id.toString() } : null;
 
+    if (updatedPr) {
+      const { broadcastCompanyUpdate } = await import('@/lib/companyEvents');
+      await broadcastCompanyUpdate(user.companyId, 'pr_updated', `Purchase Requisition ${pr.prNumber} has been ${newStatus.toLowerCase()}.`);
+    }
+
     return console.log(`[API Response] /api/v1/prs/[id]/approve - Sending response`), NextResponse.json({
       success: true,
       message: `Purchase Requisition ${newStatus.toLowerCase()}`,

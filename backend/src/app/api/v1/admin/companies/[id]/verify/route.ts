@@ -55,6 +55,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       payload: { docCount }
     });
 
+    const { broadcastCompanyUpdate } = await import('@/lib/companyEvents');
+    await broadcastCompanyUpdate(id, 'company_updated', 'Your company KYC has been verified successfully!');
+
     return console.log(`[API Response] /api/v1/admin/companies/[id]/verify - Sending response`), NextResponse.json({
       success: true,
       message: 'Company verified successfully',

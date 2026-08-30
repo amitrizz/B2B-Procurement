@@ -54,6 +54,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       payload: { reason }
     });
 
+    const { broadcastCompanyUpdate } = await import('@/lib/companyEvents');
+    await broadcastCompanyUpdate(id, 'company_updated', `Your company KYC has been rejected. Reason: ${reason}`);
+
     return console.log(`[API Response] /api/v1/admin/companies/[id]/reject - Sending response`), NextResponse.json({
       success: true,
       message: 'Company rejected successfully',

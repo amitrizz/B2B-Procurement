@@ -107,6 +107,11 @@ export async function POST(req: NextRequest, { params }: Params) {
       session.endSession();
     }
 
+    if (result && result.updatedOrder) {
+      const { broadcastOrderUpdate } = await import('@/lib/orderEvents');
+      await broadcastOrderUpdate(result.updatedOrder, 'order_updated', `Order ${order.poNumber || order._id} is ready for pickup`);
+    }
+
     return console.log(`[API Response] /api/v1/orders/[id]/ready-for-pickup - Sending response`), NextResponse.json({
       success: true,
       message: 'Order marked ready for pickup. Delivery order generated.',

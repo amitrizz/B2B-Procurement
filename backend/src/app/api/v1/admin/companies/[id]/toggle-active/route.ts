@@ -49,6 +49,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       payload: { isActive }
     });
 
+    const { broadcastCompanyUpdate } = await import('@/lib/companyEvents');
+    await broadcastCompanyUpdate(id, 'company_updated', `Your company account has been ${isActive ? 'enabled' : 'disabled'} by an admin.`);
+
     return console.log(`[API Response] /api/v1/admin/companies/[id]/toggle-active - Sending response`), NextResponse.json({
       success: true,
       message: `Company marked as ${isActive ? 'active' : 'inactive'}`,

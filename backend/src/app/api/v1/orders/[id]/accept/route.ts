@@ -55,6 +55,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const updatedPo = updatedPoDoc ? { ...updatedPoDoc, id: updatedPoDoc._id.toString() } : null;
 
+    if (updatedPoDoc) {
+      const { broadcastOrderUpdate } = await import('@/lib/orderEvents');
+      await broadcastOrderUpdate(updatedPoDoc, 'order_updated', `Purchase order ${po.poNumber || po._id} has been accepted`);
+    }
+
     return console.log(`[API Response] /api/v1/orders/[id]/accept - Sending response`), NextResponse.json({
       success: true,
       message: 'Purchase order accepted',

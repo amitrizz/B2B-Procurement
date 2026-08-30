@@ -38,6 +38,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     
     const updatedPo = updatedPoDoc ? { ...updatedPoDoc, id: updatedPoDoc._id.toString() } : null;
 
+    if (updatedPoDoc) {
+      const { broadcastOrderUpdate } = await import('@/lib/orderEvents');
+      await broadcastOrderUpdate(updatedPoDoc, 'order_updated', `Payment confirmed for order ${po.poNumber || po._id}`);
+    }
+
     return console.log(`[API Response] /api/v1/orders/[id]/pay - Sending response`), NextResponse.json({
       success: true,
       message: 'Payment recorded (offline stub)',

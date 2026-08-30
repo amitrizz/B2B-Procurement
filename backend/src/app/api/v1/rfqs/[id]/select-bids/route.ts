@@ -227,6 +227,14 @@ export async function POST(req: NextRequest, { params }: Params) {
       session.endSession();
     }
 
+    if (purchaseOrders && purchaseOrders.length > 0) {
+      const { broadcastCompanyUpdate } = await import('@/lib/companyEvents');
+      for (const po of purchaseOrders) {
+        // Send a notification to the winning supplier
+        await broadcastCompanyUpdate(po.supplierCompanyId.toString(), 'order_created', `Congratulations! Your bid was selected for RFQ ${rfq.rfqNumber}. A new Purchase Order has been created.`);
+      }
+    }
+
     return console.log(`[API Response] /api/v1/rfqs/[id]/select-bids - Sending response`), NextResponse.json({
       success: true,
       message: 'Bids selected and Purchase Order(s) generated successfully',

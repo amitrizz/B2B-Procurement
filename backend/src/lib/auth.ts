@@ -51,6 +51,7 @@ export async function getAuthUser(req: NextRequest) {
     // try to get from cookie
     const cookie = req.cookies.get('token') || req.cookies.get('accessToken');
     if (cookie) token = cookie.value;
+    else token = req.nextUrl.searchParams.get('token') || '';
   }
 
   if (!token) return null;

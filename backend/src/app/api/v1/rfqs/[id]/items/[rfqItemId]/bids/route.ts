@@ -100,6 +100,11 @@ export async function POST(req: NextRequest, { params }: Params) {
       
       const updatedBid = updatedBidDoc ? { ...updatedBidDoc, id: updatedBidDoc._id.toString() } : null;
 
+      if (updatedBid) {
+        const { broadcastCompanyUpdate } = await import('@/lib/companyEvents');
+        await broadcastCompanyUpdate(rfq.buyerCompanyId, 'bid_updated', `A supplier updated their bid for RFQ ${rfq.rfqNumber}`);
+      }
+
       return console.log(`[API Response] /api/v1/rfqs/[id]/items/[rfqItemId]/bids - Sending response`), NextResponse.json({
         success: true,
         message: 'Bid updated successfully',
@@ -124,6 +129,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     });
     
     const bid = { ...bidDoc.toObject(), id: bidDoc._id.toString() };
+
+    if (bid) {
+      const { broadcastCompanyUpdate } = await import('@/lib/companyEvents');
+      await broadcastCompanyUpdate(rfq.buyerCompanyId, 'bid_created', `A supplier submitted a new bid for RFQ ${rfq.rfqNumber}`);
+    }
 
     return console.log(`[API Response] /api/v1/rfqs/[id]/items/[rfqItemId]/bids - Sending response`), NextResponse.json({
       success: true,

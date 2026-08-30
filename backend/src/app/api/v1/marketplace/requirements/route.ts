@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getAuthUser, authErrorResponse } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
     console.log(`[API] ${req.method} ${req.nextUrl?.pathname || req.url}`);
   try {
@@ -19,7 +21,6 @@ export async function GET(req: NextRequest) {
     await import('@/models/Company');
     const mongoose = (await import('mongoose')).default;
     const whereClause: any = {
-      buyerCompanyId: { $ne: new mongoose.Types.ObjectId(user.companyId) },
       status: 'PUBLISHED',
       bidEndAt: { $gt: new Date() },
     };

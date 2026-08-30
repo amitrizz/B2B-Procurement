@@ -97,6 +97,11 @@ export async function POST(req: NextRequest, { params }: Params) {
       workImageId: updatedOrder.workImageId,
     }));
 
+    if (updatedOrderDoc) {
+      const { broadcastOrderUpdate } = await import('@/lib/orderEvents');
+      await broadcastOrderUpdate(updatedOrderDoc, 'order_updated', `Order ${order.poNumber || order._id} has moved to ${nextStatus}`);
+    }
+
     return console.log(`[API Response] /api/v1/orders/[id]/start-processing - Sending response`), NextResponse.json({
       success: true,
       message: `Order status advanced to ${nextStatus}`,

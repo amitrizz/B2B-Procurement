@@ -82,6 +82,11 @@ export async function POST(req: NextRequest, { params }: Params) {
       }
     }
 
+    if (updatedOrder) {
+      const { broadcastOrderUpdate } = await import('@/lib/orderEvents');
+      await broadcastOrderUpdate(updatedOrder, 'order_updated', `Delivery confirmed for order ${order.poNumber || order._id}. Order is now COMPLETED.`);
+    }
+
     return console.log(`[API Response] /api/v1/orders/[id]/confirm-delivery - Sending response`), NextResponse.json({
       success: true,
       message: 'Delivery confirmed and order completed',

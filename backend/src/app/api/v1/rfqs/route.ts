@@ -228,6 +228,16 @@ export async function POST(req: NextRequest) {
       session.endSession();
     }
 
+    if (rfq && rfq.status === 'PUBLISHED') {
+      const { eventEmitter } = await import('@/lib/eventEmitter');
+      // Global broadcast so all suppliers see the new RFQ in the marketplace instantly
+      eventEmitter.emit('app_event', {
+        broadcast: true,
+        type: 'marketplace_updated',
+        message: 'A new RFQ has been published to the marketplace.'
+      });
+    }
+
     return console.log(`[API Response] /api/v1/rfqs - Sending response`), NextResponse.json({
       success: true,
       message: 'RFQ published successfully',

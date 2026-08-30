@@ -49,6 +49,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       payload: { reason }
     });
 
+    const { broadcastCompanyUpdate } = await import('@/lib/companyEvents');
+    await broadcastCompanyUpdate(id, 'company_updated', `Your company account has been suspended. Reason: ${reason}`);
+
     return console.log(`[API Response] /api/v1/admin/companies/[id]/suspend - Sending response`), NextResponse.json({
       success: true,
       message: 'Company suspended successfully',

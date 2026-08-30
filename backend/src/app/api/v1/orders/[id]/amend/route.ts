@@ -76,6 +76,9 @@ export async function POST(
       session.endSession();
     }
 
+    const { broadcastOrderUpdate } = await import('@/lib/orderEvents');
+    await broadcastOrderUpdate(order, 'order_updated', `Purchase Order ${order.poNumber} has been amended by the buyer and requires your acceptance.`);
+
     return console.log(`[API Response] /api/v1/orders/[id]/amend - Sending response`), NextResponse.json({
       success: true,
       message: 'Purchase Order amended successfully and is awaiting supplier acceptance.'

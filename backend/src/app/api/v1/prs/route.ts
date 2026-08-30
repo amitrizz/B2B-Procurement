@@ -150,6 +150,11 @@ export async function POST(req: NextRequest) {
       session.endSession();
     }
 
+    if (pr) {
+      const { broadcastCompanyUpdate } = await import('@/lib/companyEvents');
+      await broadcastCompanyUpdate(user.companyId, 'pr_created', `A new Purchase Requisition (${prNumber}) was created and is pending approval.`);
+    }
+
     return console.log(`[API Response] /api/v1/prs - Sending response`), NextResponse.json({ success: true, message: 'Purchase Requisition created', data: pr });
 
   } catch (error: any) {

@@ -31,3 +31,15 @@ const UserSchema = new Schema({
 }, { timestamps: { createdAt: true, updatedAt: false }, collection: 'User' });
 
 export const User = mongoose.models.User || mongoose.model('User', UserSchema);
+
+// PushSubscription
+const PushSubscriptionSchema = new Schema({
+  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  endpoint: { type: String, required: true },
+  keys: {
+    p256dh: { type: String, required: true },
+    auth: { type: String, required: true }
+  }
+}, { timestamps: true, collection: 'PushSubscription' });
+
+export const PushSubscription = mongoose.models.PushSubscription || mongoose.model('PushSubscription', PushSubscriptionSchema);
