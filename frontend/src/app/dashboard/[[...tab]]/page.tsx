@@ -46,6 +46,7 @@ export default function Dashboard() {
     else if (tab === 'transporter') route = '/delivery';
     else if (tab !== 'marketplace') route = `/${tab}`;
     router.push(route);
+    setShowMobileSidebar(false);
   };
 
   const [rfqs, setRfqs] = useState<any[]>([]);
@@ -681,8 +682,16 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Sidebar Navigation (Desktop only) */}
-      <div className="hidden md:flex md:w-64 glass-panel border-r border-white/5 flex-col justify-between p-6">
+      {/* Mobile Sidebar Overlay */}
+      {showMobileSidebar && (
+        <div 
+          className="md:hidden fixed inset-0 bg-black/60 z-[60] backdrop-blur-sm" 
+          onClick={() => setShowMobileSidebar(false)}
+        />
+      )}
+
+      {/* Sidebar Navigation (Desktop & Mobile) */}
+      <div className={`fixed inset-y-0 left-0 z-[70] transform transition-transform duration-300 md:relative md:translate-x-0 w-64 glass-panel border-r border-white/5 flex flex-col justify-between p-6 bg-slate-950 shadow-2xl md:shadow-none ${showMobileSidebar ? 'translate-x-0' : '-translate-x-full'}`}>
         <div>
           <div className="flex justify-between items-center mb-8">
             <div className="flex items-center space-x-3">
@@ -701,6 +710,10 @@ export default function Dashboard() {
                 <span className="text-[10px] text-blue-400 font-semibold uppercase">{user.role}</span>
               </div>
             </div>
+            {/* Close Button for Mobile */}
+            <button onClick={() => setShowMobileSidebar(false)} className="md:hidden p-1 text-slate-400 hover:text-white">
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           <div className="space-y-1">
@@ -1191,7 +1204,7 @@ export default function Dashboard() {
       </div>
 
       {/* Mobile Bottom Navigation Bar */}
-      <div className={`md:hidden fixed bottom-0 left-0 right-0 bg-slate-905/98 backdrop-blur-md border-t border-white/5 z-40 grid ${user.role === 'PLATFORM_ADMIN' ? 'grid-cols-6' : 'grid-cols-4'} py-2 px-1`}>
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-905/98 backdrop-blur-md border-t border-white/5 z-40 grid grid-cols-5 py-2 px-1 pb-safe">
         <button 
           onClick={() => handleTabChange('marketplace')} 
           className={`flex flex-col items-center justify-center py-1 text-[9px] font-semibold transition-all ${activeTab === 'marketplace' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
@@ -1204,7 +1217,7 @@ export default function Dashboard() {
           className={`flex flex-col items-center justify-center py-1 text-[9px] font-semibold transition-all ${activeTab === 'my_rfqs' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
         >
           <FileText className="w-4 h-4 mb-0.5" />
-          <span className="truncate">Reqs</span>
+          <span className="truncate">{mode === 'buyer' ? 'Reqs' : 'Bids'}</span>
         </button>
         <button 
           onClick={() => handleTabChange('orders')} 
@@ -1220,24 +1233,13 @@ export default function Dashboard() {
           <User className="w-4 h-4 mb-0.5" />
           <span className="truncate">Profile</span>
         </button>
-        {user.role === 'PLATFORM_ADMIN' && (
-          <>
-            <button 
-              onClick={() => handleTabChange('transporter')} 
-              className={`flex flex-col items-center justify-center py-1 text-[9px] font-semibold transition-all ${activeTab === 'transporter' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
-            >
-              <Truck className="w-4 h-4 mb-0.5" />
-              <span className="truncate">Delivery</span>
-            </button>
-            <button 
-              onClick={() => handleTabChange('admin')} 
-              className={`flex flex-col items-center justify-center py-1 text-[9px] font-semibold transition-all ${activeTab === 'admin' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
-            >
-              <Users className="w-4 h-4 mb-0.5" />
-              <span className="truncate">Admin</span>
-            </button>
-          </>
-        )}
+        <button 
+          onClick={() => setShowMobileSidebar(true)} 
+          className="flex flex-col items-center justify-center py-1 text-[9px] font-semibold text-slate-400 transition-all hover:text-blue-400"
+        >
+          <Menu className="w-4 h-4 mb-0.5" />
+          <span className="truncate">Menu</span>
+        </button>
       </div>
 
       <style jsx global>{`
