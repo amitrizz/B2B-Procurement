@@ -235,7 +235,7 @@ export default function RequisitionsTab({
               </div>
 
               <div className="flex gap-3 pt-4 border-t border-white/10 mt-6">
-                <Button type="button" variant="outline" className="flex-1" onClick={() => setShowCreateModal(false)}>Cancel</Button>
+                <Button type="button" variant="secondary" className="flex-1" onClick={() => setShowCreateModal(false)}>Cancel</Button>
                 <Button type="submit" variant="primary" className="flex-1" disabled={loading}>
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Submit for Approval'}
                 </Button>

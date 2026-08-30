@@ -461,7 +461,7 @@ export default function ProfileTab({ user, setUser, showToast }: ProfileTabProps
                  </div>
                  <div className="flex gap-2 mt-4">
                    <Button 
-                     variant="outline" 
+                     variant="secondary" 
                      className="flex-1 text-xs"
                      onClick={() => {
                        navigator.clipboard.writeText(`${window.location.origin}/?invite=${generatedToken}`);

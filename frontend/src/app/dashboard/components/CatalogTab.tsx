@@ -182,7 +182,7 @@ export default function CatalogTab({
               </div>
               <Input label="Valid For (Days)" type="number" min="1" required value={validToDays} onChange={e => setValidToDays(Number(e.target.value))} />
               <div className="flex gap-3 pt-4 border-t border-white/10 mt-6">
-                <Button type="button" variant="outline" className="flex-1" onClick={() => setShowAddModal(false)}>Cancel</Button>
+                <Button type="button" variant="secondary" className="flex-1" onClick={() => setShowAddModal(false)}>Cancel</Button>
                 <Button type="submit" variant="primary" className="flex-1" disabled={loading}>
                   {loading ? 'Saving...' : 'Add Item'}
                 </Button>
@@ -217,7 +217,7 @@ export default function CatalogTab({
               </div>
 
               <div className="flex gap-3 pt-4 border-t border-white/10 mt-6">
-                <Button type="button" variant="outline" className="flex-1" onClick={() => setShowOrderModal(null)}>Cancel</Button>
+                <Button type="button" variant="secondary" className="flex-1" onClick={() => setShowOrderModal(null)}>Cancel</Button>
                 <Button type="submit" variant="primary" className="flex-1" disabled={loading}>
                   {loading ? 'Processing...' : 'Create Order'}
                 </Button>

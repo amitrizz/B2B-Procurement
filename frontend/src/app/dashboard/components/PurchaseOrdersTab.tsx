@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { RefreshCw, Clock, Image as ImageIcon, Loader2, X } from 'lucide-react';
+import { RefreshCw, Clock, Image as ImageIcon, Loader2, X, Sparkles } from 'lucide-react';
 
 interface PurchaseOrdersTabProps {
   orders: any[];
