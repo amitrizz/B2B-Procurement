@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getAuthUser, authErrorResponse } from '@/lib/auth';
+import mongoose from 'mongoose';
 
 type Params = {
   params: Promise<{ id: string }>
 }
 
 export async function POST(req: NextRequest, { params }: Params) {
+    console.log(`[API] ${req.method} ${req.nextUrl?.pathname || req.url}`);
   try {
     const user = await getAuthUser(req);
     if (!user) return authErrorResponse();
@@ -14,12 +16,14 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const { status, deliveryCharge, transporterId } = await req.json();
 
-    const delivery = await db.deliveryOrder.findUnique({
-      where: { id },
-    });
+    await db();
+    const { DeliveryOrder } = await import('@/models/Logistics');
+    const { PurchaseOrder } = await import('@/models/PurchaseOrder');
+
+    const delivery = await DeliveryOrder.findById(id).lean() as any;
 
     if (!delivery) {
-      return NextResponse.json(
+      return console.log(`[API Response] /api/v1/transporter/deliveries/[id] - Sending response`), NextResponse.json(
         { success: false, code: 'NOT_FOUND', message: 'Delivery order not found' },
         { status: 404 }
       );
@@ -30,11 +34,19 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (deliveryCharge !== undefined) data.deliveryCharge = deliveryCharge;
     if (transporterId) data.transporterId = transporterId;
 
-    const updatedDelivery = await db.$transaction(async (tx) => {
-      const devOrder = await tx.deliveryOrder.update({
-        where: { id },
-        data,
-      });
+    const session = await mongoose.startSession();
+    let updatedDelivery: any = null;
+
+    try {
+      session.startTransaction();
+
+      const devOrderDoc = await DeliveryOrder.findByIdAndUpdate(
+        id,
+        { $set: data },
+        { new: true, session }
+      ).lean() as any;
+      
+      updatedDelivery = devOrderDoc ? { ...devOrderDoc, id: devOrderDoc._id.toString() } : null;
 
       // Map delivery order status back to Purchase Order status
       let poStatus = '';
@@ -42,24 +54,30 @@ export async function POST(req: NextRequest, { params }: Params) {
       else if (status === 'IN_TRANSIT') poStatus = 'IN_TRANSIT';
       else if (status === 'DELIVERED') poStatus = 'DELIVERED';
 
-      if (poStatus) {
-        await tx.purchaseOrder.update({
-          where: { id: devOrder.purchaseOrderId },
-          data: { status: poStatus },
-        });
+      if (poStatus && devOrderDoc) {
+        await PurchaseOrder.updateOne(
+          { _id: devOrderDoc.purchaseOrderId },
+          { $set: { status: poStatus } },
+          { session }
+        );
       }
 
-      return devOrder;
-    });
+      await session.commitTransaction();
+    } catch (err) {
+      await session.abortTransaction();
+      throw err;
+    } finally {
+      session.endSession();
+    }
 
-    return NextResponse.json({
+    return console.log(`[API Response] /api/v1/transporter/deliveries/[id] - Sending response`), NextResponse.json({
       success: true,
       message: 'Delivery order updated successfully',
       data: updatedDelivery,
     });
   } catch (error: any) {
     console.error('Update delivery error:', error);
-    return NextResponse.json(
+    return console.log(`[API Response] /api/v1/transporter/deliveries/[id] - Sending response`), NextResponse.json(
       { success: false, code: 'SERVER_ERROR', message: 'Internal server error' },
       { status: 500 }
     );

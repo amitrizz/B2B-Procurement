@@ -14,7 +14,11 @@ import MyRequirementsTab from '../components/MyRequirementsTab';
 import PurchaseOrdersTab from '../components/PurchaseOrdersTab';
 import LocalDeliveryTab from '../components/LocalDeliveryTab';
 import AdminTab from '../components/AdminTab';
+import AdminUsersTab from '../components/AdminUsersTab';
+import StandardCatalogTab from '../components/StandardCatalogTab';
 import ProfileTab from '../components/ProfileTab';
+import RequisitionsTab from '../components/RequisitionsTab';
+import CatalogTab from '../components/CatalogTab';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -49,13 +53,21 @@ export default function Dashboard() {
   const [myBids, setMyBids] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [adminCompanies, setAdminCompanies] = useState<any[]>([]);
+  const [adminUsers, setAdminUsers] = useState<any[]>([]);
   const [deliveries, setDeliveries] = useState<any[]>([]);
+  const [prs, setPrs] = useState<any[]>([]);
+  const [catalogItems, setCatalogItems] = useState<any[]>([]);
+  const [adminPayments, setAdminPayments] = useState<any[]>([]);
+  const [companyComponents, setCompanyComponents] = useState<any[]>([]);
+  const [companyCategories, setCompanyCategories] = useState<any[]>([]);
 
   // Modals / Selection States
   const [showRfqModal, setShowRfqModal] = useState(false);
+  const [editingRfqId, setEditingRfqId] = useState<string | null>(null);
   const [newRfqTitle, setNewRfqTitle] = useState('');
   const [newRfqDesc, setNewRfqDesc] = useState('');
-  const [newRfqCategory, setNewRfqCategory] = useState('Industrial Parts');
+  const [newRfqCategory, setNewRfqCategory] = useState('');
+  const [buyerPrId, setBuyerPrId] = useState('');
   const [newRfqBidEndAt, setNewRfqBidEndAt] = useState(() => {
     const d = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -72,8 +84,18 @@ export default function Dashboard() {
   const [compareToggle, setCompareToggle] = useState<'with_material' | 'without_material'>('with_material');
 
   const [loading, setLoading] = useState(false);
+  const [submittingActions, setSubmittingActions] = useState<Record<string, boolean>>({});
   const [msg, setMsg] = useState({ type: '', text: '' });
   const [toasts, setToasts] = useState<{ id: string; type: 'success' | 'error' | 'info'; text: string }[]>([]);
+
+  const withLoading = async (actionId: string, fn: () => Promise<void>) => {
+    setSubmittingActions(prev => ({ ...prev, [actionId]: true }));
+    try {
+      await fn();
+    } finally {
+      setSubmittingActions(prev => ({ ...prev, [actionId]: false }));
+    }
+  };
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [mode, setMode] = useState<'buyer' | 'seller'>('buyer');
 
@@ -182,12 +204,44 @@ export default function Dashboard() {
         const res = await fetch('/api/v1/admin/companies', { headers });
         const d = await res.json();
         if (d.success) setAdminCompanies(d.data);
+
+        const resPay = await fetch('/api/v1/admin/payments', { headers });
+        const dPay = await resPay.json();
+        if (dPay.success) setAdminPayments(dPay.data);
+      }
+
+      if (activeTab === 'admin_users' && user?.role === 'PLATFORM_ADMIN') {
+        const res = await fetch('/api/v1/admin/users', { headers });
+        const d = await res.json();
+        if (d.success) setAdminUsers(d.data);
       }
 
       if (activeTab === 'transporter') {
         const res = await fetch('/api/v1/transporter/deliveries', { headers });
         const d = await res.json();
         if (d.success) setDeliveries(d.data);
+      }
+
+      if (activeTab === 'prs' || activeTab === 'marketplace' || activeTab === 'my_rfqs') {
+        const res = await fetch('/api/v1/prs', { headers });
+        const d = await res.json();
+        if (d.success) setPrs(d.data);
+      }
+
+      if (activeTab === 'prs' || activeTab === 'catalog' || activeTab === 'marketplace' || activeTab === 'my_rfqs') {
+        const res = await fetch('/api/v1/company/components', { headers });
+        const d = await res.json();
+        if (d.success) setCompanyComponents(d.data);
+
+        const resCat = await fetch('/api/v1/company/categories', { headers });
+        const dCat = await resCat.json();
+        if (dCat.success) setCompanyCategories(dCat.data);
+      }
+
+      if (activeTab === 'catalog') {
+        const res = await fetch('/api/v1/catalog', { headers });
+        const d = await res.json();
+        if (d.success) setCatalogItems(d.data);
       }
     } catch (err) {
       console.error(err);
@@ -201,7 +255,30 @@ export default function Dashboard() {
     router.push('/');
   };
 
-  // RFQ Creation
+  // RFQ Creation & Editing
+  const handleEditRfq = (rfq: any) => {
+    setEditingRfqId(rfq.id);
+    setNewRfqTitle(rfq.title);
+    setNewRfqDesc(rfq.description || '');
+    setNewRfqCategory(rfq.category || '');
+    if (rfq.bidEndAt) {
+      setNewRfqBidEndAt(new Date(rfq.bidEndAt).toISOString().slice(0, 10));
+    }
+    setBuyerPrId(rfq.buyerPrId || '');
+    setNewRfqItems(rfq.items.map((item: any) => ({
+      componentName: item.componentName,
+      quantity: item.quantity,
+      unit: item.unit,
+      drawingFileId: item.drawingFileId,
+      hsnCode: item.hsnCode,
+      materialOptionPreference: item.materialOptionPreference,
+      expectedTimeDays: item.expectedTimeDays,
+      drawingRevision: item.drawingRevision,
+      specification: item.specification || ''
+    })));
+    setShowRfqModal(true);
+  };
+
   const handleAddRfqItem = () => {
     setNewRfqItems([...newRfqItems, { componentName: '', quantity: 100, unit: 'pcs', drawingFileId: 'drawing_spec_' + Date.now() + '.pdf', hsnCode: '84799090', materialOptionPreference: 'WITH_MATERIAL', expectedTimeDays: 7 }]);
   };
@@ -213,6 +290,10 @@ export default function Dashboard() {
     }
     if (!newRfqCategory.trim()) {
       showToast('Please fill out the Category.', 'error');
+      return;
+    }
+    if (user?.company?.requirePr && !buyerPrId) {
+      showToast('Your company requires an Approved Purchase Requisition to publish an RFQ.', 'error');
       return;
     }
     const selectedDate = new Date(newRfqBidEndAt);
@@ -241,37 +322,44 @@ export default function Dashboard() {
       }
     }
 
-    try {
-      const headers = { 
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        'Content-Type': 'application/json'
-      };
-      const bidEndAt = new Date(newRfqBidEndAt).toISOString();
-      const res = await fetch('/api/v1/rfqs', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          title: newRfqTitle,
-          description: newRfqDesc,
-          category: newRfqCategory,
-          bidEndAt,
-          items: newRfqItems
-        })
-      });
-      const d = await res.json();
-      if (d.success) {
-        setMsg({ type: 'success', text: 'RFQ published successfully!' });
-        setShowRfqModal(false);
-        setNewRfqTitle('');
-        setNewRfqDesc('');
-        setNewRfqItems([{ componentName: 'Bracket A', quantity: 500, unit: 'pcs', drawingFileId: 'drawing_bracket_a.pdf', hsnCode: '84799090', materialOptionPreference: 'WITH_MATERIAL', expectedTimeDays: 14 }]);
-        fetchData();
-      } else {
-        setMsg({ type: 'error', text: d.message });
+    withLoading('publishRfq', async () => {
+      try {
+        const headers = { 
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        };
+        const bidEndAt = new Date(newRfqBidEndAt).toISOString();
+        const method = editingRfqId ? 'PUT' : 'POST';
+        const endpoint = editingRfqId ? `/api/v1/rfqs/${editingRfqId}` : '/api/v1/rfqs';
+        
+        const res = await fetch(endpoint, {
+          method,
+          headers,
+          body: JSON.stringify({
+            title: newRfqTitle,
+            description: newRfqDesc,
+            category: newRfqCategory,
+            bidEndAt,
+            items: newRfqItems,
+            ...(buyerPrId ? { buyerPrId } : {})
+          })
+        });
+        const d = await res.json();
+        if (d.success) {
+          showToast(`RFQ ${editingRfqId ? 'updated' : 'published'} successfully!`, 'success');
+          setShowRfqModal(false);
+          setEditingRfqId(null);
+          setNewRfqTitle('');
+          setNewRfqDesc('');
+          setNewRfqItems([{ componentName: 'Bracket A', quantity: 500, unit: 'pcs', drawingFileId: 'drawing_bracket_a.pdf', hsnCode: '84799090', materialOptionPreference: 'WITH_MATERIAL', expectedTimeDays: 14 }]);
+          fetchData();
+        } else {
+          showToast(d.message, 'error');
+        }
+      } catch (err) {
+        showToast('Failed to publish RFQ', 'error');
       }
-    } catch (err) {
-      setMsg({ type: 'error', text: 'Failed to publish RFQ' });
-    }
+    });
   };
 
   const handleStartBidding = (rfq: any) => {
@@ -307,38 +395,41 @@ export default function Dashboard() {
       return;
     }
 
-    try {
-      const headers = { 
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        'Content-Type': 'application/json'
-      };
-      const res = await fetch(`/api/v1/rfqs/${selectedRfqForBidding.id}/items/${rfqItemId}/bids`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          priceWithMaterial: item.materialOptionPreference === 'WITH_MATERIAL' ? input.priceWith : 0,
-          priceWithoutMaterial: item.materialOptionPreference === 'WITHOUT_MATERIAL' ? input.priceWithout : 0,
-          estimatedTimeDays: item.expectedTimeDays || 7, // accepts buyer's requested lead time automatically
-          materialOptionPreference: item.materialOptionPreference
-        })
-      });
-      const d = await res.json();
-      if (d.success) {
-        showToast('Bid submitted successfully for this component!', 'success');
-        setSelectedRfqForBidding(null);
-        fetchData();
-      } else {
-        showToast(d.message, 'error');
+    withLoading(`submitBid_${rfqItemId}`, async () => {
+      try {
+        const headers = { 
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        };
+        const res = await fetch(`/api/v1/rfqs/${selectedRfqForBidding.id}/items/${rfqItemId}/bids`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            priceWithMaterial: item.materialOptionPreference === 'WITH_MATERIAL' ? input.priceWith : 0,
+            priceWithoutMaterial: item.materialOptionPreference === 'WITHOUT_MATERIAL' ? input.priceWithout : 0,
+            estimatedTimeDays: item.expectedTimeDays || 7, // accepts buyer's requested lead time automatically
+            materialOptionPreference: item.materialOptionPreference
+          })
+        });
+        const d = await res.json();
+        if (d.success) {
+          showToast('Bid submitted successfully for this component!', 'success');
+          setSelectedRfqForBidding(null);
+          fetchData();
+        } else {
+          showToast(d.message, 'error');
+        }
+      } catch (err) {
+        showToast('Failed to submit bid', 'error');
       }
-    } catch (err) {
-      showToast('Failed to submit bid', 'error');
-    }
+    });
   };
 
   const handleWithdrawBid = async (rfqItemId: string) => {
     if (!confirm('Are you sure you want to withdraw your quote for this component?')) return;
-    try {
-      const headers = { 'Authorization': `Bearer ${localStorage.getItem('token')}` };
+    withLoading(`withdrawBid_${rfqItemId}`, async () => {
+      try {
+        const headers = { 'Authorization': `Bearer ${localStorage.getItem('token')}` };
       const res = await fetch(`/api/v1/rfqs/${selectedRfqForBidding.id}/items/${rfqItemId}/bids`, {
         method: 'DELETE',
         headers,
@@ -358,9 +449,10 @@ export default function Dashboard() {
       } else {
         showToast(d.message, 'error');
       }
-    } catch (err) {
-      showToast('Failed to withdraw bid', 'error');
-    }
+      } catch (err) {
+        showToast('Failed to withdraw bid', 'error');
+      }
+    });
   };
 
   const handleViewRfqDetails = async (rfqId: string) => {
@@ -414,8 +506,12 @@ export default function Dashboard() {
     formData.append('file', file);
 
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch('/api/v1/upload', {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
         body: formData,
       });
       const data = await res.json();
@@ -548,7 +644,14 @@ export default function Dashboard() {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Building className="w-5 h-5 text-blue-500" />
-            <span className="font-extrabold text-xs text-white uppercase tracking-wider">{user.company?.name || 'Platform Admin'}</span>
+            <span className="font-extrabold text-xs text-white uppercase tracking-wider flex items-center gap-1.5">
+              {user.company?.name || 'Platform Admin'}
+              {user.company && (user.company.isActive !== false ? (
+                <span className="px-1.5 py-0.5 bg-green-500/10 text-green-400 border border-green-500/20 rounded text-[9px] font-bold">ACTIVE</span>
+              ) : (
+                <span className="px-1.5 py-0.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded text-[9px] font-bold">INACTIVE</span>
+              ))}
+            </span>
           </div>
           <button
             onClick={handleLogout}
@@ -560,20 +663,22 @@ export default function Dashboard() {
         </div>
 
         {/* Global Mode Toggle Switch */}
-        <div className="bg-slate-950 p-1 rounded-xl border border-white/5 flex w-full">
-          <button
-            onClick={() => setMode('buyer')}
-            className={`flex-1 py-1 rounded-lg text-[11px] font-bold text-center transition-all ${mode === 'buyer' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}
-          >
-            Procure Mode
-          </button>
-          <button
-            onClick={() => setMode('seller')}
-            className={`flex-1 py-1 rounded-lg text-[11px] font-bold text-center transition-all ${mode === 'seller' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}
-          >
-            Supply Mode
-          </button>
-        </div>
+        {user.role !== 'TRANSPORTER' && user.role !== 'PLATFORM_ADMIN' && (
+          <div className="bg-slate-950 p-1 rounded-xl border border-white/5 flex w-full">
+            <button
+              onClick={() => setMode('buyer')}
+              className={`flex-1 py-1 rounded-lg text-[11px] font-bold text-center transition-all ${mode === 'buyer' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}
+            >
+              Procure Mode
+            </button>
+            <button
+              onClick={() => setMode('seller')}
+              className={`flex-1 py-1 rounded-lg text-[11px] font-bold text-center transition-all ${mode === 'seller' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}
+            >
+              Supply Mode
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Sidebar Navigation (Desktop only) */}
@@ -585,50 +690,80 @@ export default function Dashboard() {
                 <Building className="w-6 h-6" />
               </div>
               <div>
-                <h2 className="font-extrabold text-sm tracking-tight text-white">{user.company?.name || 'Platform Admin'}</h2>
+                <h2 className="font-extrabold text-sm tracking-tight text-white flex items-center gap-1.5">
+                  {user.company?.name || 'Platform Admin'}
+                  {user.company && (user.company.isActive !== false ? (
+                    <span className="px-1.5 py-0.5 bg-green-500/10 text-green-400 border border-green-500/20 rounded text-[9px] font-bold">ACTIVE</span>
+                  ) : (
+                    <span className="px-1.5 py-0.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded text-[9px] font-bold">INACTIVE</span>
+                  ))}
+                </h2>
                 <span className="text-[10px] text-blue-400 font-semibold uppercase">{user.role}</span>
               </div>
             </div>
           </div>
 
           <div className="space-y-1">
-            <button
-              onClick={() => handleTabChange('marketplace')}
-              className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'marketplace' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
-            >
-              <Search className="w-4 h-4" />
-              <span>Public Marketplace</span>
-            </button>
+            {user.role !== 'TRANSPORTER' && (
+              <>
+                <button
+                  onClick={() => handleTabChange('marketplace')}
+                  className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'marketplace' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
+                >
+                  <Search className="w-4 h-4" />
+                  <span>Public Marketplace</span>
+                </button>
 
-            {mode === 'seller' && (
-              <button
-                onClick={() => handleTabChange('my_rfqs')}
-                className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'my_rfqs' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
-              >
-                <FileText className="w-4 h-4" />
-                <span>My Submitted Bids</span>
-              </button>
+                <button
+                  onClick={() => handleTabChange('catalog')}
+                  className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'catalog' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                  <span>{mode === 'buyer' ? 'Internal Components' : 'Standard Catalog'}</span>
+                </button>
+
+                {mode === 'seller' && user.role !== 'FINANCE' && (
+                  <button
+                    onClick={() => handleTabChange('my_rfqs')}
+                    className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'my_rfqs' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>My Submitted Bids</span>
+                  </button>
+                )}
+                
+                {mode === 'buyer' && user.role !== 'PLATFORM_ADMIN' && (
+                  <>
+                    <button
+                      onClick={() => handleTabChange('prs')}
+                      className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'prs' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
+                    >
+                      <FileText className="w-4 h-4" />
+                      <span>Purchase Requisitions</span>
+                    </button>
+                    {user.role !== 'FINANCE' && (
+                      <button
+                        onClick={() => handleTabChange('my_rfqs')}
+                        className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'my_rfqs' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        <FileText className="w-4 h-4" />
+                        <span>My Requirements</span>
+                      </button>
+                    )}
+                  </>
+                )}
+
+                <button
+                  onClick={() => handleTabChange('orders')}
+                  className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'orders' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                  <span>Purchase Orders</span>
+                </button>
+              </>
             )}
-            
-            {mode === 'buyer' && (
-              <button
-                onClick={() => handleTabChange('my_rfqs')}
-                className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'my_rfqs' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
-              >
-                <FileText className="w-4 h-4" />
-                <span>My Requirements</span>
-              </button>
-            )}
 
-            <button
-              onClick={() => handleTabChange('orders')}
-              className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'orders' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
-            >
-              <ShoppingCart className="w-4 h-4" />
-              <span>Purchase Orders</span>
-            </button>
-
-            {user.role === 'PLATFORM_ADMIN' && (
+            {(user.role === 'PLATFORM_ADMIN' || user.role === 'TRANSPORTER') && (
               <button
                 onClick={() => handleTabChange('transporter')}
                 className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'transporter' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
@@ -647,13 +782,22 @@ export default function Dashboard() {
             </button>
 
             {user.role === 'PLATFORM_ADMIN' && (
-              <button
-                onClick={() => handleTabChange('admin')}
-                className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'admin' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
-              >
-                <Users className="w-4 h-4" />
-                <span>KYC & Platform Admin</span>
-              </button>
+              <>
+                <button
+                  onClick={() => handleTabChange('admin')}
+                  className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'admin' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
+                >
+                  <Users className="w-4 h-4" />
+                  <span>KYC & Platform Admin</span>
+                </button>
+                <button
+                  onClick={() => handleTabChange('admin_users')}
+                  className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'admin_users' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
+                >
+                  <Users className="w-4 h-4" />
+                  <span>List of Users</span>
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -678,20 +822,22 @@ export default function Dashboard() {
           </div>
 
           {/* Global Mode Switcher in Header */}
-          <div className="bg-slate-900 border border-white/5 p-1 rounded-xl flex w-64">
-            <button
-              onClick={() => setMode('buyer')}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-bold text-center transition-all ${mode === 'buyer' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              Procure Mode
-            </button>
-            <button
-              onClick={() => setMode('seller')}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-bold text-center transition-all ${mode === 'seller' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              Supply Mode
-            </button>
-          </div>
+          {user.role !== 'TRANSPORTER' && user.role !== 'PLATFORM_ADMIN' && (
+            <div className="bg-slate-900 border border-white/5 p-1 rounded-xl flex w-64">
+              <button
+                onClick={() => setMode('buyer')}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-bold text-center transition-all ${mode === 'buyer' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                Procure Mode
+              </button>
+              <button
+                onClick={() => setMode('seller')}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-bold text-center transition-all ${mode === 'seller' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                Supply Mode
+              </button>
+            </div>
+          )}
         </div>
 
         {msg.text && (
@@ -717,6 +863,17 @@ export default function Dashboard() {
             user={user}
             setActiveTab={handleTabChange}
             setSelectedRfqForDetails={setSelectedRfqForDetails}
+            submittingActions={submittingActions}
+          />
+        )}
+
+        {activeTab === 'catalog' && mode === 'buyer' && (
+          <StandardCatalogTab 
+            user={user}
+            companyComponents={companyComponents}
+            companyCategories={companyCategories}
+            fetchData={fetchData}
+            showToast={showToast}
           />
         )}
 
@@ -727,13 +884,14 @@ export default function Dashboard() {
             setSelectedRfqForDetails={setSelectedRfqForDetails}
             fetchData={fetchData}
             setShowRfqModal={setShowRfqModal}
+            handleEditRfq={handleEditRfq}
             handleSelectWinner={handleSelectWinner}
             handleViewRfqDetails={handleViewRfqDetails}
             mode={mode}
           />
         )}
 
-        {activeTab === 'orders' && (
+        {activeTab === 'orders' && user.role !== 'TRANSPORTER' && (
           <PurchaseOrdersTab
             orders={orders}
             fetchData={fetchData}
@@ -744,7 +902,7 @@ export default function Dashboard() {
           />
         )}
 
-        {activeTab === 'transporter' && user?.role === 'PLATFORM_ADMIN' && (
+        {activeTab === 'transporter' && (user.role === 'PLATFORM_ADMIN' || user.role === 'TRANSPORTER') && (
           <LocalDeliveryTab
             deliveries={deliveries}
             fetchData={fetchData}
@@ -752,11 +910,19 @@ export default function Dashboard() {
           />
         )}
 
-        {activeTab === 'admin' && user?.role === 'PLATFORM_ADMIN' && (
+        {activeTab === 'admin' && user.role === 'PLATFORM_ADMIN' && (
           <AdminTab
             adminCompanies={adminCompanies}
+            adminPayments={adminPayments}
             fetchData={fetchData}
             handleVerifyCompany={handleVerifyCompany}
+          />
+        )}
+
+        {activeTab === 'admin_users' && user.role === 'PLATFORM_ADMIN' && (
+          <AdminUsersTab
+            adminUsers={adminUsers}
+            fetchData={fetchData}
           />
         )}
 
@@ -768,15 +934,76 @@ export default function Dashboard() {
           />
         )}
 
+        {activeTab === 'prs' && (
+          <RequisitionsTab
+            prs={prs}
+            fetchData={fetchData}
+            user={user}
+            showToast={showToast}
+            companyComponents={companyComponents}
+          />
+        )}
+
+        {activeTab === 'catalog' && mode === 'seller' && (
+          <CatalogTab
+            catalogItems={catalogItems}
+            fetchData={fetchData}
+            user={user}
+            showToast={showToast}
+            mode={mode}
+          />
+        )}
+
       </div>
 
       {/* Publish RFQ Modal */}
       {showRfqModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-2xl p-6 flex flex-col max-h-[90vh] shadow-2xl">
-            <h3 className="text-lg font-bold text-white mb-4">Create B2B Procurement Requirement</h3>
+            <h3 className="text-lg font-bold text-white mb-4">{editingRfqId ? 'Edit B2B Procurement Requirement' : 'Create B2B Procurement Requirement'}</h3>
             
             <div className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+              <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl mb-2">
+                <label className="text-[10px] text-yellow-500 font-bold uppercase tracking-wider block mb-2">
+                  {user?.company?.requirePr ? 'Approved Purchase Requisition Required ' : 'Link Purchase Requisition (Optional) '}
+                  {user?.company?.requirePr && <span className="text-red-500">*</span>}
+                </label>
+                <select
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2 text-sm text-slate-200 focus:outline-none"
+                  value={buyerPrId}
+                  required={user?.company?.requirePr}
+                  onChange={(e) => {
+                    const selectedPrId = e.target.value;
+                    setBuyerPrId(selectedPrId);
+                    if (selectedPrId) {
+                      const pr = prs.find(p => p.id === selectedPrId);
+                      if (pr) {
+                        setNewRfqTitle(pr.title || '');
+                        setNewRfqDesc(pr.description || '');
+                        if (pr.lines && pr.lines.length > 0) {
+                          setNewRfqItems(pr.lines.map((line: any) => ({
+                            componentName: line.componentName,
+                            quantity: line.quantity,
+                            unit: line.unit || 'pcs',
+                            drawingFileId: '',
+                            hsnCode: '84799090',
+                            materialOptionPreference: 'WITH_MATERIAL',
+                            expectedTimeDays: 7,
+                            drawingRevision: 'v1',
+                            specification: ''
+                          })));
+                        }
+                      }
+                    }
+                  }}
+                >
+                  <option value="">Select an Approved PR...</option>
+                  {prs.filter(pr => pr.status === 'APPROVED').map(pr => (
+                    <option key={pr.id} value={pr.id}>{pr.prNumber} - {pr.title}</option>
+                  ))}
+                </select>
+              </div>
+              
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Requirement Title <span className="text-red-500">*</span></label>
@@ -785,18 +1012,23 @@ export default function Dashboard() {
                     placeholder="e.g. Gearbox Component Castings"
                     value={newRfqTitle}
                     onChange={(e) => setNewRfqTitle(e.target.value)}
-                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none"
+                    disabled={!!buyerPrId}
+                    className={`w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none ${buyerPrId ? 'opacity-50 cursor-not-allowed' : ''}`}
                   />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Category <span className="text-red-500">*</span></label>
-                  <input
-                    type="text"
-                    placeholder="Category"
+                  <select
+                    required
                     value={newRfqCategory}
                     onChange={(e) => setNewRfqCategory(e.target.value)}
                     className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none"
-                  />
+                  >
+                    <option value="" disabled>Select category...</option>
+                    {companyCategories.map(c => (
+                      <option key={c.id} value={c.categoryName}>{c.categoryName}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Bidding End Date <span className="text-red-500">*</span></label>
@@ -816,7 +1048,8 @@ export default function Dashboard() {
                   placeholder="Description of specifications and standards required..."
                   value={newRfqDesc}
                   onChange={(e) => setNewRfqDesc(e.target.value)}
-                  className="w-full h-24 bg-slate-950 border border-white/10 rounded-xl p-4 text-sm text-slate-200 focus:outline-none resize-none"
+                  disabled={!!buyerPrId}
+                  className={`w-full h-24 bg-slate-950 border border-white/10 rounded-xl p-4 text-sm text-slate-200 focus:outline-none resize-none ${buyerPrId ? 'opacity-50 cursor-not-allowed' : ''}`}
                 />
               </div>
 
@@ -836,7 +1069,8 @@ export default function Dashboard() {
                             items[idx].componentName = e.target.value;
                             setNewRfqItems(items);
                           }}
-                          className="w-full bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-200"
+                          disabled={!!buyerPrId}
+                          className={`w-full bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 ${buyerPrId ? 'opacity-50 cursor-not-allowed' : ''}`}
                         />
                       </div>
                       <div className="space-y-1">
@@ -850,7 +1084,8 @@ export default function Dashboard() {
                             items[idx].quantity = Number(e.target.value);
                             setNewRfqItems(items);
                           }}
-                          className="w-full bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-200"
+                          disabled={!!buyerPrId}
+                          className={`w-full bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 ${buyerPrId ? 'opacity-50 cursor-not-allowed' : ''}`}
                         />
                       </div>
                       <div className="space-y-1">
@@ -866,7 +1101,7 @@ export default function Dashboard() {
                         </label>
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end pt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end pt-1">
                       <div className="space-y-1">
                         <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Material Sourcing Option <span className="text-red-500">*</span></label>
                         <select
@@ -893,26 +1128,52 @@ export default function Dashboard() {
                             items[idx].expectedTimeDays = Number(e.target.value);
                             setNewRfqItems(items);
                           }}
-                          className="w-full bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-200"
+                          className="w-full bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">HSN Code <span className="text-red-500">*</span></label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 84799090"
+                          value={item.hsnCode || ''}
+                          onChange={(e) => {
+                            const items = [...newRfqItems];
+                            items[idx].hsnCode = e.target.value;
+                            setNewRfqItems(items);
+                          }}
+                          className="w-full bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none"
                         />
                       </div>
                     </div>
                   </div>
                 ))}
-                <button onClick={handleAddRfqItem} className="text-xs text-blue-400 font-semibold hover:underline">+ Add Component</button>
+                {!buyerPrId && (
+                  <button onClick={handleAddRfqItem} className="text-xs text-blue-400 font-semibold hover:underline">+ Add Component</button>
+                )}
               </div>
             </div>
 
             <div className="flex justify-end gap-3 pt-4 border-t border-white/5 mt-4">
-              <button onClick={() => setShowRfqModal(false)} className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white">Cancel</button>
-              <button onClick={handlePublishRfq} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold">Publish Requirement</button>
+              <button onClick={() => { setShowRfqModal(false); setEditingRfqId(null); }} className="px-5 py-2 text-slate-300 hover:text-white text-xs font-semibold" disabled={submittingActions['publishRfq']}>Cancel</button>
+              <button 
+                onClick={handlePublishRfq} 
+                disabled={submittingActions['publishRfq']}
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center min-w-[140px]"
+              >
+                {submittingActions['publishRfq'] ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  editingRfqId ? 'Save Changes' : 'Publish Requirement'
+                )}
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {/* Toast Container */}
-      <div className="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none">
+      <div className="fixed top-5 right-5 z-[60] flex flex-col gap-2 pointer-events-none">
         {toasts.map(t => (
           <div
             key={t.id}

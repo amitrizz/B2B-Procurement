@@ -3,27 +3,55 @@ import { db } from '@/lib/db';
 import { verifyPassword, generateAccessToken, generateRefreshToken } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
+    console.log(`[API] ${req.method} ${req.nextUrl?.pathname || req.url}`);
   try {
     const { email, password } = await req.json();
 
+    console.log('[API] /login - Step 1: Validating payload');
     if (!email || !password) {
-      return NextResponse.json(
+      console.log('[API] /login - Error: Missing email or password');
+      return console.log(`[API Response] /api/v1/auth/login - Sending response`), NextResponse.json(
         { success: false, code: 'BAD_REQUEST', message: 'Missing email or password' },
         { status: 400 }
       );
     }
 
-    const user = await db.user.findUnique({
-      where: { email },
-      include: { company: true },
-    });
+    console.log(`[API] /login - Step 2: Fetching user ${email} from database`);
 
-    if (!user || !verifyPassword(password, user.passwordHash)) {
-      return NextResponse.json(
+    await db();
+    const { User } = await import('@/models/User');
+    await import('@/models/Company');
+
+    const userDoc = await User.findOne({ email }).populate('companyId').lean() as any;
+    
+    // Map Mongoose object to match expected Prisma format
+    const user = userDoc ? {
+      ...userDoc,
+      id: userDoc._id.toString(),
+      company: userDoc.companyId ? { 
+        ...userDoc.companyId, 
+        id: userDoc.companyId._id.toString() 
+      } : null
+    } : null;
+
+    if (!user) {
+      console.log(`[API] /login - Error: User ${email} not found`);
+      return console.log(`[API Response] /api/v1/auth/login - Sending response`), NextResponse.json(
         { success: false, code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' },
         { status: 401 }
       );
     }
+
+    console.log(`[API] /login - Step 3: Verifying password for ${email}`);
+    if (!verifyPassword(password, user.passwordHash)) {
+      console.log(`[API] /login - Error: Invalid password for ${email}`);
+      return console.log(`[API Response] /api/v1/auth/login - Sending response`), NextResponse.json(
+        { success: false, code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' },
+        { status: 401 }
+      );
+    }
+
+    console.log(`[API] /login - Step 4: Generating tokens for ${email}`);
 
     const accessToken = generateAccessToken({
       userId: user.id,
@@ -33,14 +61,15 @@ export async function POST(req: NextRequest) {
 
     const refreshToken = generateRefreshToken({ userId: user.id });
 
-    // Save refresh token in DB
-    await db.refreshToken.create({
-      data: {
-        userId: user.id,
-        token: refreshToken,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h
-      },
+    console.log(`[API] /login - Step 5: Saving refresh token in DB`);
+    const { RefreshToken: RefreshTokenModel } = await import('@/models/User');
+    await RefreshTokenModel.create({
+      userId: user.id,
+      token: refreshToken,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h
     });
+
+    console.log(`[API] /login - Success: Returning auth response and setting cookies`);
 
     const response = NextResponse.json({
       success: true,
@@ -80,9 +109,21 @@ export async function POST(req: NextRequest) {
     return response;
   } catch (error: any) {
     console.error('Login error:', error);
-    return NextResponse.json(
-      { success: false, code: 'SERVER_ERROR', message: 'Internal server error' },
-      { status: 500 }
+    
+    let message = 'Internal server error';
+    let code = 'SERVER_ERROR';
+    let status = 500;
+
+    // Handle Mongoose database connection errors
+    if (error.name === 'MongooseServerSelectionError' || error.message?.includes('database connection') || error.message?.includes('unreachable network')) {
+      message = 'Unable to connect to the database server. Please try again later.';
+      code = 'DATABASE_UNREACHABLE';
+      status = 503;
+    }
+
+    return console.log(`[API Response] /api/v1/auth/login - Sending response`), NextResponse.json(
+      { success: false, code, message },
+      { status }
     );
   }
 }

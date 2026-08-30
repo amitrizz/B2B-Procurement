@@ -5,23 +5,25 @@ import jwt from 'jsonwebtoken';
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-for-development-use-only';
 
 export async function POST(req: NextRequest) {
+    console.log(`[API] ${req.method} ${req.nextUrl?.pathname || req.url}`);
   try {
     const { email } = await req.json();
 
     if (!email) {
-      return NextResponse.json(
+      return console.log(`[API Response] /api/v1/auth/forgot-password - Sending response`), NextResponse.json(
         { success: false, code: 'BAD_REQUEST', message: 'Email is required' },
         { status: 400 }
       );
     }
 
-    const user = await db.user.findUnique({
-      where: { email },
-    });
+    await db();
+    const { User } = await import('@/models/User');
+
+    const user = await User.findOne({ email }).lean() as any;
 
     if (!user) {
       // Return success with a mock message to prevent email enumeration, but no token details
-      return NextResponse.json({
+      return console.log(`[API Response] /api/v1/auth/forgot-password - Sending response`), NextResponse.json({
         success: true,
         message: 'If the email exists in our system, a password reset link has been generated.',
       });
@@ -37,7 +39,7 @@ export async function POST(req: NextRequest) {
     console.log(`Reset Link: ${resetLink}`);
     console.log(`======================================================\n`);
 
-    return NextResponse.json({
+    return console.log(`[API Response] /api/v1/auth/forgot-password - Sending response`), NextResponse.json({
       success: true,
       message: 'Password reset link has been generated.',
       data: {
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('Forgot password error:', error);
-    return NextResponse.json(
+    return console.log(`[API Response] /api/v1/auth/forgot-password - Sending response`), NextResponse.json(
       { success: false, code: 'SERVER_ERROR', message: 'Internal server error' },
       { status: 500 }
     );

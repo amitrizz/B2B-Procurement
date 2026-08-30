@@ -1,4 +1,5 @@
-import { RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import { RefreshCw, CheckCircle } from 'lucide-react';
 
 interface LocalDeliveryTabProps {
   deliveries: any[];
@@ -11,6 +12,19 @@ export default function LocalDeliveryTab({
   fetchData,
   handleUpdateDeliveryStatus
 }: LocalDeliveryTabProps) {
+  const [deliveryOtp, setDeliveryOtp] = useState<{ [key: string]: string }>({});
+  const [errorMap, setErrorMap] = useState<{ [key: string]: string }>({});
+
+  const handleDeliver = (del: any) => {
+    const input = deliveryOtp[del.id];
+    if (!input || input !== del.otpHash) {
+       setErrorMap({ ...errorMap, [del.id]: 'Invalid OTP. Please ask the supplier.' });
+       return;
+    }
+    setErrorMap({ ...errorMap, [del.id]: '' });
+    handleUpdateDeliveryStatus(del.id, 'DELIVERED');
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -58,12 +72,25 @@ export default function LocalDeliveryTab({
                   </button>
                 )}
                 {del.status === 'PICKED_UP' && (
-                  <button
-                    onClick={() => handleUpdateDeliveryStatus(del.id, 'DELIVERED')}
-                    className="py-1.5 px-3.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold"
-                  >
-                    Mark Delivered
-                  </button>
+                  <div className="flex flex-col gap-2 items-end">
+                    <div className="flex gap-2 items-center">
+                      <input 
+                        type="text" 
+                        placeholder="Enter 6-digit OTP" 
+                        className="bg-slate-900 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white outline-none w-32 focus:border-green-500"
+                        value={deliveryOtp[del.id] || ''}
+                        onChange={(e) => setDeliveryOtp({ ...deliveryOtp, [del.id]: e.target.value })}
+                        maxLength={6}
+                      />
+                      <button
+                        onClick={() => handleDeliver(del)}
+                        className="py-1.5 px-3.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" /> Mark Delivered
+                      </button>
+                    </div>
+                    {errorMap[del.id] && <span className="text-red-400 text-[10px]">{errorMap[del.id]}</span>}
+                  </div>
                 )}
               </div>
             </div>

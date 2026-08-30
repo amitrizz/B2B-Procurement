@@ -38,6 +38,18 @@ const nextConfig: NextConfig = {
         source: "/admin",
         destination: "/dashboard/admin",
       },
+      {
+        source: "/admin_users",
+        destination: "/dashboard/admin_users",
+      },
+      {
+        source: "/catalog",
+        destination: "/dashboard/catalog",
+      },
+      {
+        source: "/prs",
+        destination: "/dashboard/prs",
+      },
     ];
   },
 };

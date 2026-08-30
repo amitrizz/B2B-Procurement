@@ -5,12 +5,13 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+    console.log(`[API] ${req.method} ${req.nextUrl?.pathname || req.url}`);
   try {
     const { id } = await params;
 
-    const fileRecord = await db.fileStorage.findUnique({
-      where: { id },
-    });
+    await db();
+    const { FileStorage } = await import('@/models/Platform');
+    const fileRecord = await FileStorage.findById(id).lean() as any;
 
     if (!fileRecord) {
       return new Response('File not found', { status: 404 });

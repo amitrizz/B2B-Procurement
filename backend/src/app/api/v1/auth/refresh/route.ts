@@ -3,11 +3,12 @@ import { db } from '@/lib/db';
 import { verifyToken, generateAccessToken, generateRefreshToken } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
+    console.log(`[API] ${req.method} ${req.nextUrl?.pathname || req.url}`);
   try {
     const { refreshToken } = await req.json();
 
     if (!refreshToken) {
-      return NextResponse.json(
+      return console.log(`[API Response] /api/v1/auth/refresh - Sending response`), NextResponse.json(
         { success: false, code: 'BAD_REQUEST', message: 'Missing refresh token' },
         { status: 400 }
       );
@@ -15,69 +16,66 @@ export async function POST(req: NextRequest) {
 
     const decoded = verifyToken(refreshToken);
     if (!decoded) {
-      return NextResponse.json(
+      return console.log(`[API Response] /api/v1/auth/refresh - Sending response`), NextResponse.json(
         { success: false, code: 'INVALID_TOKEN', message: 'Invalid or expired refresh token' },
         { status: 401 }
       );
     }
 
+    await db();
+    const { RefreshToken, User } = await import('@/models/User');
+
     // Check token state in DB
-    const dbToken = await db.refreshToken.findUnique({
-      where: { token: refreshToken },
-    });
+    const dbToken = await RefreshToken.findOne({ token: refreshToken }).lean() as any;
 
     if (!dbToken) {
-      return NextResponse.json(
+      return console.log(`[API Response] /api/v1/auth/refresh - Sending response`), NextResponse.json(
         { success: false, code: 'INVALID_TOKEN', message: 'Refresh token not recognized' },
         { status: 401 }
       );
     }
 
     // Detect reuse of revoked token (compromise attempt)
-    if (dbToken.revoked || dbToken.expiresAt < new Date()) {
+    if (dbToken.revoked || new Date(dbToken.expiresAt) < new Date()) {
       // Revoke all tokens for this user!
-      await db.refreshToken.updateMany({
-        where: { userId: dbToken.userId },
-        data: { revoked: true },
-      });
-      return NextResponse.json(
+      await RefreshToken.updateMany(
+        { userId: dbToken.userId },
+        { $set: { revoked: true } }
+      );
+      return console.log(`[API Response] /api/v1/auth/refresh - Sending response`), NextResponse.json(
         { success: false, code: 'COMPROMISE_DETECTED', message: 'Compromise signal detected. Force logging out all sessions.' },
         { status: 401 }
       );
     }
 
-    const user = await db.user.findUnique({
-      where: { id: dbToken.userId },
-    });
+    const user = await User.findById(dbToken.userId).lean() as any;
 
     if (!user) {
-      return NextResponse.json(
+      return console.log(`[API Response] /api/v1/auth/refresh - Sending response`), NextResponse.json(
         { success: false, code: 'USER_NOT_FOUND', message: 'User not found' },
         { status: 401 }
       );
     }
 
     // Revoke the used token and create a new rotated pair
-    await db.refreshToken.update({
-      where: { id: dbToken.id },
-      data: { revoked: true },
-    });
+    await RefreshToken.updateOne(
+      { _id: dbToken._id },
+      { $set: { revoked: true } }
+    );
 
     const newAccessToken = generateAccessToken({
-      userId: user.id,
+      userId: user._id.toString(),
       role: user.role,
-      companyId: user.companyId,
+      companyId: user.companyId ? user.companyId.toString() : null,
     });
 
-    const newRefreshToken = generateRefreshToken({ userId: user.id });
+    const newRefreshToken = generateRefreshToken({ userId: user._id.toString() });
 
     // Save the new refresh token
-    await db.refreshToken.create({
-      data: {
-        userId: user.id,
-        token: newRefreshToken,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h
-      },
+    await RefreshToken.create({
+      userId: user._id,
+      token: newRefreshToken,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h
     });
 
     const response = NextResponse.json({
@@ -102,10 +100,10 @@ export async function POST(req: NextRequest) {
       maxAge: 86400,
     });
 
-    return response;
+    return console.log(`[API Response] /api/v1/auth/refresh - Sending response`), response;
   } catch (error: any) {
     console.error('Refresh token error:', error);
-    return NextResponse.json(
+    return console.log(`[API Response] /api/v1/auth/refresh - Sending response`), NextResponse.json(
       { success: false, code: 'SERVER_ERROR', message: 'Internal server error' },
       { status: 500 }
     );

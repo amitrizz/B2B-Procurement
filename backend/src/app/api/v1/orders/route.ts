@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getAuthUser, authErrorResponse } from '@/lib/auth';
+import mongoose from 'mongoose';
 
 export async function GET(req: NextRequest) {
+    console.log(`[API] ${req.method} ${req.nextUrl?.pathname || req.url}`);
   try {
     const user = await getAuthUser(req);
     if (!user || !user.companyId) return authErrorResponse();
@@ -10,25 +12,85 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
     const type = searchParams.get('type') || 'buying'; // buying or selling
 
-    const whereClause: any = {};
+    await db();
+    const { PurchaseOrder } = await import('@/models/PurchaseOrder');
+    await import('@/models/Company');
+    await import('@/models/RFQ');
+
+    const matchClause: any = {};
     if (type === 'buying') {
-      whereClause.buyerCompanyId = user.companyId;
+      matchClause.buyerCompanyId = new mongoose.Types.ObjectId(user.companyId);
     } else {
-      whereClause.supplierCompanyId = user.companyId;
+      matchClause.supplierCompanyId = new mongoose.Types.ObjectId(user.companyId);
     }
 
-    const orders = await db.purchaseOrder.findMany({
-      where: whereClause,
-      include: {
-        buyerCompany: { select: { name: true } },
-        supplierCompany: { select: { name: true } },
-        items: {
-          include: {
-            rfqItem: true,
-          },
-        },
+    const ordersDoc = await PurchaseOrder.aggregate([
+      { $match: matchClause },
+      { $sort: { createdAt: -1 } },
+      {
+        $lookup: {
+          from: 'Company',
+          localField: 'buyerCompanyId',
+          foreignField: '_id',
+          as: 'buyerCompany'
+        }
       },
-      orderBy: { createdAt: 'desc' },
+      {
+        $addFields: {
+          'buyerCompany': { $arrayElemAt: ['$buyerCompany', 0] }
+        }
+      },
+      {
+        $lookup: {
+          from: 'Company',
+          localField: 'supplierCompanyId',
+          foreignField: '_id',
+          as: 'supplierCompany'
+        }
+      },
+      {
+        $addFields: {
+          'supplierCompany': { $arrayElemAt: ['$supplierCompany', 0] }
+        }
+      },
+      {
+        $lookup: {
+          from: 'POItem',
+          localField: '_id',
+          foreignField: 'poId',
+          as: 'items'
+        }
+      },
+      {
+        $lookup: {
+          from: 'RFQItem',
+          localField: 'items.rfqItemId',
+          foreignField: '_id',
+          as: 'rfqItems'
+        }
+      }
+    ]);
+
+    const orders = ordersDoc.map((o: any) => {
+      const items = o.items.map((i: any) => {
+        const rfqItem = o.rfqItems.find((r: any) => r._id.toString() === i.rfqItemId.toString());
+        return {
+          ...i,
+          id: i._id.toString(),
+          rfqItem: rfqItem ? { ...rfqItem, id: rfqItem._id.toString() } : null
+        };
+      });
+
+      return {
+        ...o,
+        id: o._id.toString(),
+        buyerCompany: o.buyerCompany ? { name: o.buyerCompany.name } : null,
+        supplierCompany: o.supplierCompany ? { name: o.supplierCompany.name } : null,
+        items
+      };
+    }).map((o: any) => {
+       delete o.rfqItems;
+       return o;
     });
 
     // Log first order's workImage fields for debugging
@@ -46,13 +108,13 @@ export async function GET(req: NextRequest) {
       }));
     }
 
-    return NextResponse.json({
+    return console.log(`[API Response] /api/v1/orders - Sending response`), NextResponse.json({
       success: true,
       data: orders,
     });
   } catch (error: any) {
     console.error('List orders error:', error);
-    return NextResponse.json(
+    return console.log(`[API Response] /api/v1/orders - Sending response`), NextResponse.json(
       { success: false, code: 'SERVER_ERROR', message: 'Internal server error' },
       { status: 500 }
     );

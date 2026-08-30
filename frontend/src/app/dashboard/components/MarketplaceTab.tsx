@@ -1,4 +1,5 @@
-import { RefreshCw, ArrowLeft, ChevronRight, Search } from 'lucide-react';
+import { RefreshCw, ArrowLeft, ChevronRight, Search, X } from 'lucide-react';
+import { useState } from 'react';
 
 interface MarketplaceTabProps {
   marketplaceRfqs: any[];
@@ -14,6 +15,7 @@ interface MarketplaceTabProps {
   user: any;
   setActiveTab: (tab: string) => void;
   setSelectedRfqForDetails: (rfq: any) => void;
+  submittingActions?: Record<string, boolean>;
 }
 
 export default function MarketplaceTab({
@@ -29,8 +31,57 @@ export default function MarketplaceTab({
   mode,
   user,
   setActiveTab,
-  setSelectedRfqForDetails
+  setSelectedRfqForDetails,
+  submittingActions = {}
 }: MarketplaceTabProps) {
+  const [viewFileId, setViewFileId] = useState<string | null>(null);
+  const [showNdaModal, setShowNdaModal] = useState<{fileId: string} | null>(null);
+  const [acceptingNda, setAcceptingNda] = useState(false);
+
+  const handleViewDrawing = async (fileId: string) => {
+    try {
+      const res = await fetch(`/api/v1/upload/${fileId}`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (res.status === 403) {
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          if (data.code === 'NDA_REQUIRED') {
+            setShowNdaModal({ fileId });
+            return;
+          }
+        } catch(e) {
+          // not json
+        }
+      }
+      setViewFileId(fileId);
+    } catch (err) {
+      setViewFileId(fileId); // fallback
+    }
+  };
+
+  const handleAcceptNda = async () => {
+    if (!showNdaModal) return;
+    setAcceptingNda(true);
+    try {
+      const res = await fetch('/api/v1/company/me/accept-drawings-nda', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (res.ok) {
+        setViewFileId(showNdaModal.fileId);
+        setShowNdaModal(null);
+      } else {
+        alert('Failed to accept NDA');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to accept NDA');
+    } finally {
+      setAcceptingNda(false);
+    }
+  };
 
   const filteredRfqs = marketplaceRfqs.filter((rfq: any) => {
     if (mode === 'buyer') {
@@ -97,7 +148,7 @@ export default function MarketplaceTab({
                   <p className="text-[10px] text-slate-500 mt-1 font-semibold uppercase">
                     Sourcing option: {item.materialOptionPreference === 'WITH_MATERIAL' ? 'With Material' : 'Without Material'}
                   </p>
-                  <p className="text-[10px] text-slate-500 mt-1">Drawing: <a href={`/uploads/${item.drawingFileId}`} target="_blank" rel="noreferrer" className="underline text-blue-500">{item.drawingFileId}</a></p>
+                  <p className="text-[10px] text-slate-500 mt-1">Drawing: <button onClick={() => handleViewDrawing(item.drawingFileId)} className="underline text-blue-500 hover:text-blue-400">{item.drawingFileId}</button></p>
                 </div>
                 <div className="space-y-4">
                   <div className="space-y-1">
@@ -161,23 +212,26 @@ export default function MarketplaceTab({
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleSubmitBid(item.id)}
+                        disabled={submittingActions[`submitBid_${item.id}`]}
                         className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold uppercase tracking-wider py-2.5 rounded-xl transition-all duration-300 transform active:scale-95 shadow-lg shadow-blue-500/10 hover:shadow-blue-500/25 flex items-center justify-center gap-2"
                       >
-                        Update Quote
+                        {submittingActions[`submitBid_${item.id}`] ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Update Quote'}
                       </button>
                       <button
                         onClick={() => handleWithdrawBid(item.id)}
-                        className="px-4 py-2.5 bg-red-600/10 border border-red-500/20 hover:bg-red-600 text-red-400 hover:text-white text-xs font-bold rounded-xl transition-all duration-300 transform active:scale-95"
+                        disabled={submittingActions[`withdrawBid_${item.id}`]}
+                        className="px-4 py-2.5 bg-red-600/10 border border-red-500/20 hover:bg-red-600 text-red-400 hover:text-white text-xs font-bold rounded-xl transition-all duration-300 transform active:scale-95 flex items-center justify-center min-w-[90px]"
                       >
-                        Withdraw
+                        {submittingActions[`withdrawBid_${item.id}`] ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Withdraw'}
                       </button>
                     </div>
                   ) : (
                     <button
                       onClick={() => handleSubmitBid(item.id)}
+                      disabled={submittingActions[`submitBid_${item.id}`]}
                       className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-extrabold uppercase tracking-wider py-2.5 rounded-xl transition-all duration-300 transform active:scale-95 shadow-lg shadow-blue-500/10 hover:shadow-blue-500/25 flex items-center justify-center gap-2"
                     >
-                      Submit Bid Quote
+                      {submittingActions[`submitBid_${item.id}`] ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Submit Bid Quote'}
                     </button>
                   )}
                 </div>
@@ -242,6 +296,65 @@ export default function MarketplaceTab({
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {/* Document Viewer Modal */}
+      {viewFileId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden relative">
+            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-slate-950/50">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                Drawing Document
+              </h3>
+              <button 
+                onClick={() => setViewFileId(null)}
+                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 bg-slate-950 p-4 overflow-hidden">
+              <iframe 
+                src={`/uploads/${viewFileId}`} 
+                className="w-full h-full rounded-xl border border-white/5 bg-white"
+                title="Drawing Viewer"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NDA Modal */}
+      {showNdaModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg p-6 relative">
+            <h3 className="text-lg font-bold text-white mb-4">Non-Disclosure Agreement</h3>
+            <div className="bg-slate-950 border border-white/5 rounded-xl p-4 h-48 overflow-y-auto text-xs text-slate-400 mb-6 space-y-3 custom-scrollbar">
+              <p>By viewing these drawings, you agree to the following terms and conditions:</p>
+              <p>1. <strong>Confidentiality:</strong> You agree to keep all drawings, specifications, and related technical information completely confidential.</p>
+              <p>2. <strong>Non-Use:</strong> The provided information shall only be used for the purpose of submitting a bid quote for this specific requirement. You shall not use the information for manufacturing, reverse engineering, or any other commercial purpose without explicit authorization.</p>
+              <p>3. <strong>Non-Disclosure:</strong> You shall not disclose, distribute, or share these drawings with any third party, competitor, or unauthorized personnel within your organization.</p>
+              <p>4. <strong>Data Deletion:</strong> Upon completion of the bidding process, or upon request, you agree to securely delete and destroy any copies of these drawings.</p>
+              <p>Violation of this agreement may result in immediate suspension from the platform and potential legal action.</p>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => setShowNdaModal(null)}
+                className="px-4 py-2 text-sm font-semibold text-slate-300 hover:text-white transition-colors"
+                disabled={acceptingNda}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleAcceptNda}
+                disabled={acceptingNda}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-colors shadow-lg shadow-blue-500/20 disabled:opacity-50"
+              >
+                {acceptingNda ? 'Accepting...' : 'I Agree & View Drawing'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

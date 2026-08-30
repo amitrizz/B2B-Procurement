@@ -43,7 +43,9 @@ export async function getAuthUser(req: NextRequest) {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     token = authHeader.substring(7);
   } else {
-    token = req.cookies.get('accessToken')?.value || '';
+    // try to get from cookie
+    const cookie = req.cookies.get('token') || req.cookies.get('accessToken');
+    if (cookie) token = cookie.value;
   }
 
   if (!token) return null;
@@ -51,12 +53,33 @@ export async function getAuthUser(req: NextRequest) {
   if (!decoded) return null;
 
   // Verify user still exists
-  const user = await db.user.findUnique({
-    where: { id: decoded.userId },
-    include: { company: true },
-  });
+  try {
+    await db();
+    const { User } = await import('@/models/User');
+    await import('@/models/Company'); // Ensure Company model is registered for populate
 
-  return user;
+    const userDoc = await User.findById(decoded.userId).populate('companyId').lean() as any;
+    
+    if (!userDoc) return null;
+
+    // Map Mongoose structure back to what the app expects from Prisma
+    const user = {
+      ...userDoc,
+      id: userDoc._id.toString(),
+      companyId: userDoc.companyId ? userDoc.companyId._id.toString() : null,
+      company: userDoc.companyId ? { 
+        ...userDoc.companyId, 
+        id: userDoc.companyId._id.toString() 
+      } : null
+    };
+
+    return user;
+  } catch (error: any) {
+    console.error(`[DB Error in getAuthUser] Failed to fetch user. DB might be unreachable.`);
+    const cleanError = new Error('Database server is unreachable');
+    cleanError.name = 'DatabaseConnectionError';
+    throw cleanError;
+  }
 }
 
 export function authErrorResponse(message = 'Unauthorized') {

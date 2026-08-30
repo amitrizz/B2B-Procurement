@@ -20,6 +20,10 @@ export default function PurchaseOrdersTab({
 }: PurchaseOrdersTabProps) {
   const [uploadingOrderId, setUploadingOrderId] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ src: string; label: string } | null>(null);
+  const [reviewOrder, setReviewOrder] = useState<any | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const getFriendlyStatus = (status: string) => {
     switch (status) {
@@ -53,8 +57,12 @@ export default function PurchaseOrdersTab({
     formData.append('file', file);
 
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch('/api/v1/upload', {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
         body: formData
       });
       const data = await res.json();
@@ -79,8 +87,12 @@ export default function PurchaseOrdersTab({
     formData.append('file', file);
 
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch('/api/v1/upload', {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
         body: formData
       });
       const data = await res.json();
@@ -93,6 +105,139 @@ export default function PurchaseOrdersTab({
       alert('Failed to upload work image');
     } finally {
       setUploadingOrderId(null);
+    }
+  };
+
+  const handleApproveMilestone = async (orderId: string, milestone: string) => {
+    setActionLoading(`approve-${orderId}`);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/v1/orders/${orderId}/milestones/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ milestone })
+      });
+      const data = await res.json();
+      if (data.success) {
+         fetchData();
+      } else {
+         alert(data.message || 'Failed to approve milestone');
+      }
+    } catch (err) {
+      alert('Error approving milestone');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const submitReview = async () => {
+    if (!reviewOrder) return;
+    setActionLoading(`review-${reviewOrder.id}`);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/v1/orders/${reviewOrder.id}/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ rating: reviewRating, comment: reviewComment })
+      });
+      const data = await res.json();
+      if (data.success) {
+         alert('Review submitted successfully!');
+         setReviewOrder(null);
+         fetchData();
+      } else {
+         alert(data.message || 'Failed to submit review');
+      }
+    } catch (err) {
+      alert('Error submitting review');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleGenerateInvoice = async (orderId: string) => {
+    setActionLoading(`invoice-${orderId}`);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/v1/orders/${orderId}/generate-invoice`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+         alert('Tax Invoice generated successfully with E-Invoice STUB!');
+         fetchData();
+      } else {
+         alert(data.message || 'Failed to generate invoice');
+      }
+    } catch (err) {
+      alert('Error generating invoice');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handlePayInvoice = async (order: any, invoice: any) => {
+    setActionLoading(`pay-${invoice.id}`);
+    try {
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => {
+        const options = {
+          key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_mock',
+          amount: invoice.total, // paise
+          currency: 'INR',
+          name: 'P2P Procurement',
+          description: `Payment for Invoice ${invoice.number}`,
+          handler: async function (response: any) {
+            const token = localStorage.getItem('token');
+            await fetch(`/api/v1/orders/${order.id}/pay`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            alert('Payment completed successfully!');
+            fetchData();
+          },
+          prefill: {
+             name: 'Finance Team',
+             email: 'finance@company.com'
+          },
+          theme: { color: '#3399cc' }
+        };
+        const rzp = new (window as any).Razorpay(options);
+        rzp.open();
+        setActionLoading(null);
+      };
+      document.body.appendChild(script);
+    } catch (err) {
+      alert('Error initializing payment');
+      setActionLoading(null);
+    }
+  };
+
+  const handleAmendPO = async (orderId: string) => {
+    const reason = prompt('Enter reason for amendment (e.g. adjust payment terms):');
+    if (!reason) return;
+    
+    setActionLoading(`amend-${orderId}`);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/v1/orders/${orderId}/amend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ reason })
+      });
+      const data = await res.json();
+      if (data.success) {
+         alert('PO Amended successfully. It is now awaiting supplier acceptance again.');
+         fetchData();
+      } else {
+         alert(data.message || 'Failed to amend PO');
+      }
+    } catch (err) {
+      alert('Error amending PO');
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -128,7 +273,7 @@ export default function PurchaseOrdersTab({
 
               <div>
                 <span className="text-[10px] text-slate-500 font-semibold block uppercase">Total Amount</span>
-                <span className="font-bold text-sm text-slate-200 mt-1 block">₹{Number(order.totalAmount).toLocaleString()}</span>
+                <span className="font-bold text-sm text-slate-200 mt-1 block">₹{(Number(order.totalAmount) / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
               </div>
 
               <div>
@@ -259,12 +404,79 @@ export default function PurchaseOrdersTab({
                   </>
                 )}
 
-                {order.flowType === 'Buying' && order.status === 'DELIVERED' && (
+                {order.flowType === 'Buying' && (
+                  <div className="flex flex-col gap-2 items-end">
+                    {/* Buyer Milestone Approvals */}
+                    {(order.status === 'ACCEPTED' || order.status === 'CREATED') && (
+                      <button onClick={() => handleAmendPO(order.id)} disabled={actionLoading === `amend-${order.id}`} className="py-1.5 px-3 bg-red-600/20 border border-red-600/50 hover:bg-red-600/40 text-red-400 rounded-lg text-xs font-bold transition-all active:scale-95">
+                        {actionLoading === `amend-${order.id}` ? 'Amending...' : 'Amend PO Terms'}
+                      </button>
+                    )}
+
+                    {order.invoices?.map((inv: any) => (
+                      inv.type === 'TAX_INVOICE' && inv.status === 'UNPAID' && (
+                        <button key={inv.id} onClick={() => handlePayInvoice(order, inv)} disabled={actionLoading === `pay-${inv.id}`} className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all active:scale-95 shadow-[0_0_15px_rgba(37,99,235,0.5)]">
+                          {actionLoading === `pay-${inv.id}` ? 'Processing...' : `Pay Invoice ${inv.number} (Razorpay)`}
+                        </button>
+                      )
+                    ))}
+
+                    {(order.status === 'PROCESSING_20' && order.milestoneApproved !== 'PROCESSING_20') && (
+                      <button onClick={() => handleApproveMilestone(order.id, 'PROCESSING_20')} disabled={actionLoading === `approve-${order.id}`} className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all active:scale-95">
+                        {actionLoading === `approve-${order.id}` ? 'Approving...' : 'Approve 20% Milestone'}
+                      </button>
+                    )}
+                    {(order.status === 'PROCESSING_40' && order.milestoneApproved !== 'PROCESSING_40') && (
+                      <button onClick={() => handleApproveMilestone(order.id, 'PROCESSING_40')} disabled={actionLoading === `approve-${order.id}`} className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all active:scale-95">
+                        {actionLoading === `approve-${order.id}` ? 'Approving...' : 'Approve 40% Milestone'}
+                      </button>
+                    )}
+                    {(order.status === 'PROCESSING_60' && order.milestoneApproved !== 'PROCESSING_60') && (
+                      <button onClick={() => handleApproveMilestone(order.id, 'PROCESSING_60')} disabled={actionLoading === `approve-${order.id}`} className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all active:scale-95">
+                        {actionLoading === `approve-${order.id}` ? 'Approving...' : 'Approve 60% Milestone'}
+                      </button>
+                    )}
+                    {(order.status === 'PROCESSING_80' && order.milestoneApproved !== 'PROCESSING_80') && (
+                      <button onClick={() => handleApproveMilestone(order.id, 'PROCESSING_80')} disabled={actionLoading === `approve-${order.id}`} className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all active:scale-95">
+                        {actionLoading === `approve-${order.id}` ? 'Approving...' : 'Approve 80% Milestone'}
+                      </button>
+                    )}
+
+                    {order.status === 'DELIVERED' && (
+                      <button
+                        onClick={() => handleConfirmDelivery(order.id)}
+                        className="py-1.5 px-3 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold transition-all active:scale-95"
+                      >
+                        Confirm Delivery (GRN)
+                      </button>
+                    )}
+
+                    {order.status === 'COMPLETED' && !order.reviews?.length && (
+                      <button
+                        onClick={() => setReviewOrder(order)}
+                        className="py-1.5 px-3 bg-yellow-500 hover:bg-yellow-600 text-black rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-1"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" /> Leave a Review
+                      </button>
+                    )}
+                    
+                    {/* OTP Hash display for Supplier to give to Transporter */}
+                    {order.deliveryOrder?.otpHash && order.status === 'READY_FOR_PICKUP' && (
+                       <div className="mt-2 text-[10px] bg-slate-800 p-2 rounded text-slate-300">
+                          <span className="block font-bold mb-0.5 text-blue-400">Delivery OTP</span>
+                          Please provide the OTP sent to your registered contact to the Transporter to begin delivery.
+                       </div>
+                    )}
+                  </div>
+                )}
+
+                {order.flowType === 'Selling' && order.status === 'COMPLETED' && !order.invoices?.find((i: any) => i.type === 'TAX_INVOICE') && (
                   <button
-                    onClick={() => handleConfirmDelivery(order.id)}
+                    onClick={() => handleGenerateInvoice(order.id)}
+                    disabled={actionLoading === `invoice-${order.id}`}
                     className="py-1.5 px-3 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold transition-all active:scale-95"
                   >
-                    Confirm Delivery
+                    {actionLoading === `invoice-${order.id}` ? 'Generating...' : 'Generate Tax Invoice'}
                   </button>
                 )}
               </div>
@@ -299,6 +511,52 @@ export default function PurchaseOrdersTab({
                 alt={lightbox.label}
                 className="max-w-full max-h-[65vh] object-contain rounded-lg"
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Review Modal */}
+      {reviewOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setReviewOrder(null)}>
+          <div className="relative max-w-md w-full bg-slate-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-white">Rate Supplier</h3>
+              <button onClick={() => setReviewOrder(null)}><X className="w-5 h-5 text-slate-400" /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Rating (1-5)</label>
+                <div className="flex gap-2">
+                  {[1,2,3,4,5].map(num => (
+                    <button 
+                      key={num}
+                      type="button"
+                      onClick={() => setReviewRating(num)}
+                      className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold transition-all ${reviewRating >= num ? 'bg-yellow-500 text-black' : 'bg-slate-800 text-slate-400'}`}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Comment</label>
+                <textarea
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-blue-500"
+                  rows={4}
+                  placeholder="How was the part quality and delivery speed?"
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                />
+              </div>
+              <button
+                onClick={submitReview}
+                disabled={actionLoading === `review-${reviewOrder.id}`}
+                className="w-full py-3 bg-yellow-500 hover:bg-yellow-600 disabled:bg-yellow-700 text-black rounded-xl font-bold transition-all"
+              >
+                {actionLoading === `review-${reviewOrder.id}` ? 'Submitting...' : 'Submit Review'}
+              </button>
             </div>
           </div>
         </div>

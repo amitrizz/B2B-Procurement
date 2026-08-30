@@ -4,16 +4,19 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3001",
-    "build": "prisma generate && npx tsx prisma/seed.ts && next build",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
-    "@prisma/client": "^6.19.3",
+    "@aws-sdk/client-s3": "^3.1121.0",
+    "jose": "^6.2.10",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.33.0",
+    "minio": "^8.0.7",
+    "mongoose": "^9.9.4",
     "next": "16.3.2",
-    "prisma": "^6.19.3",
+    "razorpay": "^2.9.8",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },

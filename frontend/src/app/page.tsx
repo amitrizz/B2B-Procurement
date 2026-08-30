@@ -11,6 +11,7 @@ export default function Home() {
   const [name, setName] = useState('');
   const [gstin, setGstin] = useState('');
   const [resetToken, setResetToken] = useState('');
+  const [inviteToken, setInviteToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -29,14 +30,35 @@ export default function Home() {
     }
   }, [router]);
 
-  // Detect resetToken in query parameters
+  // Detect resetToken or inviteToken in query parameters
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      const token = params.get('resetToken');
-      if (token) {
-        setResetToken(token);
+      const rToken = params.get('resetToken');
+      const iToken = params.get('inviteToken') || params.get('invite');
+      
+      if (rToken) {
+        setResetToken(rToken);
         setAuthMode('reset');
+      } else if (iToken) {
+        setInviteToken(iToken);
+        setAuthMode('register');
+        
+        try {
+          // Decode the JWT payload (the second part of the token)
+          const base64Url = iToken.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+          }).join(''));
+          const payload = JSON.parse(jsonPayload);
+          
+          if (payload.email) {
+            setEmail(payload.email);
+          }
+        } catch (e) {
+          console.error('Failed to decode invite token', e);
+        }
       }
     }
   }, []);
@@ -48,7 +70,15 @@ export default function Home() {
     setSuccessMsg('');
 
     const endpoint = authMode === 'login' ? '/api/v1/auth/login' : '/api/v1/auth/register';
-    const body = authMode === 'login' ? { email, password } : { email, password, name, gstin };
+    
+    // For registration via invite, we only need basic user info
+    // Otherwise we need company info for a new company registration
+    const basePayload = { email, password, name };
+    const fullPayload = { ...basePayload, gstin, pan: 'ABCDE1234F', phone: '9999999999', addressLine1: '123 Main St', city: 'Mumbai', state: 'Maharashtra', pincode: '400001', role: 'OWNER' };
+    
+    const body = authMode === 'login' 
+      ? { email, password } 
+      : (inviteToken ? { ...basePayload, inviteToken } : fullPayload);
 
     try {
       const res = await fetch(endpoint, {
@@ -199,30 +229,33 @@ export default function Home() {
                   <>
                     <div className="space-y-1.5">
                       <label className="text-xs text-slate-400 flex items-center gap-1.5">
-                        <Building className="w-3.5 h-3.5" /> Company Name
+                        <User className="w-3.5 h-3.5" /> Your Name
                       </label>
                       <input
                         type="text"
                         required
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="Enter company name"
+                        placeholder="John Doe"
                         className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition-all text-white"
                       />
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-slate-400 flex items-center gap-1.5">
-                        <Shield className="w-3.5 h-3.5" /> GSTIN
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={gstin}
-                        onChange={(e) => setGstin(e.target.value)}
-                        placeholder="15-digit GSTIN number"
-                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition-all text-white"
-                      />
-                    </div>
+                    
+                    {!inviteToken && (
+                      <div className="space-y-1.5">
+                        <label className="text-xs text-slate-400 flex items-center gap-1.5">
+                          <Shield className="w-3.5 h-3.5" /> Company GSTIN
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={gstin}
+                          onChange={(e) => setGstin(e.target.value)}
+                          placeholder="15-digit GSTIN number"
+                          className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition-all text-white"
+                        />
+                      </div>
+                    )}
                   </>
                 )}
 
@@ -236,7 +269,8 @@ export default function Home() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@company.com"
-                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition-all text-white"
+                    disabled={!!inviteToken}
+                    className={`w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition-all text-white ${inviteToken ? 'opacity-60 cursor-not-allowed' : ''}`}
                   />
                 </div>
 

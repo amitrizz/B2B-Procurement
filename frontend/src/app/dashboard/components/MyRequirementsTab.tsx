@@ -7,8 +7,9 @@ interface MyRequirementsTabProps {
   setSelectedRfqForDetails: (rfq: any) => void;
   fetchData: () => Promise<void>;
   setShowRfqModal: (show: boolean) => void;
-  handleSelectWinner: (rfqItemId: string, bidId: string) => Promise<void>;
+  handleSelectWinner: (rfqItemId: string, bidId: string, qty?: number) => Promise<void>;
   handleViewRfqDetails: (rfqId: string) => Promise<void>;
+  handleEditRfq: (rfq: any) => void;
   mode: 'buyer' | 'seller';
 }
 
@@ -20,12 +21,14 @@ export default function MyRequirementsTab({
   setShowRfqModal,
   handleSelectWinner,
   handleViewRfqDetails,
+  handleEditRfq,
   mode
 }: MyRequirementsTabProps) {
   const subTab = mode === 'buyer' ? 'buying' : 'selling';
   const [statusFilter, setStatusFilter] = useState<'open' | 'in_progress' | 'closed'>('open');
   const [myBids, setMyBids] = useState<any[]>([]);
   const [loadingBids, setLoadingBids] = useState(false);
+  const [awardModal, setAwardModal] = useState<{ rfqItemId: string, bidId: string, maxQty: number, currentQty: number } | null>(null);
 
   const fetchMyBids = async () => {
     setLoadingBids(true);
@@ -199,7 +202,7 @@ export default function MyRequirementsTab({
                             <tbody>
                               {item.bids.map((bid: any) => {
                                 const qty = Number(item.quantity) || 0;
-                                const totalBase = Number(item.materialOptionPreference === 'WITH_MATERIAL' ? bid.priceWithMaterial : bid.priceWithoutMaterial) || 0;
+                                const totalBase = (Number(item.materialOptionPreference === 'WITH_MATERIAL' ? bid.priceWithMaterial : bid.priceWithoutMaterial) || 0) / 100;
                                 const totalEstimated = totalBase * 1.23; // base + 18% tax + 5% commission
                                 const unitPrice = qty > 0 ? (totalBase / qty) : 0;
 
@@ -230,10 +233,10 @@ export default function MyRequirementsTab({
                                         <span className="text-red-400 bg-red-500/10 px-2.5 py-1.5 rounded-lg">Rejected</span>
                                       ) : (
                                         <button
-                                          onClick={() => handleSelectWinner(item.id, bid.id)}
+                                          onClick={() => setAwardModal({ rfqItemId: item.id, bidId: bid.id, maxQty: Number(item.quantity), currentQty: Number(item.quantity) })}
                                           className="px-3 py-1 bg-green-600/10 border border-green-500/20 text-green-400 hover:bg-green-600 hover:text-white rounded-lg text-[10px] font-bold transition-all"
                                         >
-                                          Accept Bid
+                                          Award Bid
                                         </button>
                                       )}
                                     </td>
@@ -266,18 +269,29 @@ export default function MyRequirementsTab({
                       <h3 className="font-bold text-base text-white mt-2.5">{rfq.title}</h3>
                       <p className="text-xs text-slate-400 mt-1.5 line-clamp-2">{rfq.description}</p>
                       <div className="mt-4 pt-3 border-t border-white/5 space-y-1.5 text-[11px] text-slate-400">
+                        {rfq.pr && (
+                          <div>Linked PR: <span className="font-semibold text-slate-200">{rfq.pr.prNumber}</span></div>
+                        )}
                         <div>Components: <span className="font-semibold text-slate-200">{rfq.items.length} parts</span></div>
                         <div>Ends: <span className="font-semibold text-slate-200">{new Date(rfq.bidEndAt).toLocaleDateString()}</span></div>
                       </div>
                     </div>
                     {statusFilter === 'open' && (
-                      <button
-                        onClick={() => handleViewRfqDetails(rfq.id)}
-                        className="w-full py-2.5 bg-blue-600/10 border border-blue-500/20 text-blue-400 hover:bg-blue-600 hover:text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
-                      >
-                        <span>Compare Bids & Select Winner</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleViewRfqDetails(rfq.id)}
+                          className="flex-1 py-2.5 bg-blue-600/10 border border-blue-500/20 text-blue-400 hover:bg-blue-600 hover:text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                        >
+                          <span>Compare Bids & Select Winner</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleEditRfq(rfq)}
+                          className="py-2.5 px-3 bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 rounded-xl text-xs font-semibold transition-all"
+                        >
+                          Edit
+                        </button>
+                      </div>
                     )}
                   </div>
                 ))
@@ -303,15 +317,31 @@ export default function MyRequirementsTab({
               const totalBase = Number(bid.materialOptionPreference === 'WITH_MATERIAL' ? bid.priceWithMaterial : bid.priceWithoutMaterial) || 0;
               const totalEstimated = totalBase * 1.23;
               const unitPrice = qty > 0 ? (totalBase / qty) : 0;
+              let displayStatus = bid.status;
+              let statusStyle = 'text-blue-400 bg-blue-500/10';
+
+              if (bid.status === 'ACCEPTED') {
+                if (bid.rfq?.status === 'COMPLETED') {
+                  displayStatus = 'COMPLETED';
+                  statusStyle = 'text-green-400 bg-green-500/10';
+                } else {
+                  statusStyle = 'text-green-400 bg-green-500/10';
+                }
+              } else if (bid.status === 'REJECTED') {
+                statusStyle = 'text-red-400 bg-red-500/10';
+              } else if (bid.rfq?.status === 'CANCELLED' || bid.rfq?.status === 'EXPIRED' || bid.rfq?.status === 'COMPLETED') {
+                displayStatus = bid.rfq.status;
+                statusStyle = 'text-slate-400 bg-slate-500/10';
+              } else if (bid.status === 'WITHDRAWN') {
+                statusStyle = 'text-slate-400 bg-slate-500/10';
+              }
 
               return (
                 <div key={bid.id} className="glass-card rounded-2xl p-5 border border-white/5 flex flex-col justify-between space-y-4">
                   <div>
                     <div className="flex justify-between items-start">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
-                        bid.status === 'ACCEPTED' ? 'text-green-400 bg-green-500/10' : bid.status === 'REJECTED' ? 'text-red-400 bg-red-500/10' : 'text-blue-400 bg-blue-500/10'
-                      }`}>
-                        {bid.status}
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${statusStyle}`}>
+                        {displayStatus}
                       </span>
                       <span className="text-[10px] text-slate-500 font-semibold">{bid.rfq?.rfqNumber}</span>
                     </div>
@@ -343,6 +373,39 @@ export default function MyRequirementsTab({
               );
             })
           )}
+        </div>
+      )}
+
+      {/* Award Bid Modal */}
+      {awardModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setAwardModal(null)}>
+          <div className="relative max-w-sm w-full bg-slate-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-white mb-4">Award Bid</h3>
+            <p className="text-xs text-slate-400 mb-4">You can award the full quantity or split it.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Quantity to Award</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={awardModal.maxQty}
+                  value={awardModal.currentQty}
+                  onChange={(e) => setAwardModal({ ...awardModal, currentQty: Number(e.target.value) })}
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
+                />
+                <span className="text-[10px] text-slate-500 block mt-1">Max available to award: {awardModal.maxQty}</span>
+              </div>
+              <button
+                onClick={() => {
+                  handleSelectWinner(awardModal.rfqItemId, awardModal.bidId, awardModal.currentQty);
+                  setAwardModal(null);
+                }}
+                className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold transition-all active:scale-95 shadow-lg shadow-green-500/20"
+              >
+                Confirm Award
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

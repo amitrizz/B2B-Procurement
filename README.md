@@ -1,50 +1,47 @@
 # B2B Procurement Marketplace
 
-A premium, production-ready full-stack B2B procurement marketplace built with Next.js, App Router, TypeScript, Tailwind CSS, PostgreSQL, Prisma, Redis, and MinIO.
+A premium, production-ready full-stack B2B procurement marketplace built with Next.js, App Router, TypeScript, Tailwind CSS, MongoDB, and Prisma.
+
+## Phase 1 Stack
+- **Database**: MongoDB ONLY (No Postgres, No MinIO, No Redis for Phase 1).
 
 ## Getting Started
 
 ### Prerequisites
-
 - Node.js (v20+)
-- Docker & Docker Compose
+- MongoDB Atlas (or local MongoDB server)
 
 ### Installation & Local Setup
 
-1. **Clone the repository and install dependencies:**
-   ```bash
-   npm install
-   ```
-
-2. **Configure environment variables:**
-   Verify configurations in `.env`:
+1. **Configure environment variables in both `/backend` and `/frontend`:**
+   Create `.env` file based on `.env.example`:
    ```env
-   DATABASE_URL="postgresql://postgres:password@localhost:45432/b2b_procurement?schema=public"
+   DATABASE_URL="mongodb+srv://..."
    JWT_SECRET="your-jwt-secret-key"
+   EMAIL_VERIFY_REQUIRED="false"
    ```
 
-3. **Start local services via Docker Compose:**
-   This spins up PostgreSQL and MinIO:
+2. **Wipe & Seed the Database (from the `backend` directory):**
    ```bash
-   docker compose up -d postgres minio
-   ```
-
-4. **Sync the Database Schema and Seed initial data:**
-   ```bash
+   cd backend
+   npx prisma generate
    npx prisma db push
    npx tsx prisma/seed.ts
    ```
 
-5. **Run the Next.js development server:**
+3. **Start the Development Servers:**
+   Terminal 1 (Backend):
    ```bash
+   cd backend
    npm run dev
    ```
-   Open [http://localhost:3000](http://localhost:3000) to view the portal.
+   
+   Terminal 2 (Frontend):
+   ```bash
+   cd frontend
+   npm run dev
+   ```
 
-### Seed Accounts (Logins)
-
-We seed standard test accounts for instant happy-path flow testing:
-- **Buyer Portal (Alpha Buyers):** `buyer@b2b.com` / `buyerpassword`
-- **Supplier Portal (Beta Mfg):** `supplier@b2b.com` / `supplierpassword`
-- **Platform Admin (Super Admin):** `admin@b2b.com` / `adminpassword`
-- **Transporter (Apex Logistics):** `supplier@b2b.com` / `supplierpassword`
+### Seed Accounts (Phase 1)
+- **Buyer (Karnataka):** `amit@gmail.com` / `1234`
+- **Supplier (Maharashtra):** `amitsagar121001@gmail.com` / `1234`
