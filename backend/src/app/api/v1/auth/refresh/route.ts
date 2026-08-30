@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     await RefreshToken.create({
       userId: user._id,
       token: newRefreshToken,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30d
     });
 
     const response = NextResponse.json({
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 86400,
+      maxAge: 30 * 24 * 60 * 60, // 30d
     });
 
     return console.log(`[API Response] /api/v1/auth/refresh - Sending response`), response;

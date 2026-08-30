@@ -21,7 +21,7 @@ export default function CatalogTab({
 }: CatalogTabProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showOrderModal, setShowOrderModal] = useState<any>(null);
-  
+
   // Add item state
   const [name, setName] = useState('');
   const [hsnCode, setHsnCode] = useState('');
@@ -29,10 +29,10 @@ export default function CatalogTab({
   const [price, setPrice] = useState(0);
   const [validToDays, setValidToDays] = useState(30);
   const [loading, setLoading] = useState(false);
-  
+
   // Order state
   const [orderQty, setOrderQty] = useState(1);
-  
+
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -75,7 +75,7 @@ export default function CatalogTab({
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!showOrderModal) return;
-    
+
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
@@ -149,7 +149,7 @@ export default function CatalogTab({
                   <span className="font-semibold text-slate-400">{new Date(item.validTo).toLocaleDateString()}</span>
                 </div>
               </div>
-              
+
               {mode === 'buyer' && (
                 <button
                   onClick={() => {
@@ -204,10 +204,10 @@ export default function CatalogTab({
                 <span className="font-bold text-green-400">₹{(Number(showOrderModal.unitPrice) / 100).toLocaleString('en-IN')}</span>
               </div>
             </div>
-            
+
             <form onSubmit={handleCreateOrder} className="space-y-4">
               <Input label="Order Quantity" type="number" min={1} required value={orderQty} onChange={e => setOrderQty(Number(e.target.value))} />
-              
+
               <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
                 <div className="flex justify-between text-sm font-bold text-blue-400">
                   <span>Estimated Total:</span>

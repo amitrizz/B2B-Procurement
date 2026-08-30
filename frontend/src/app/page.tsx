@@ -93,6 +93,9 @@ export default function Home() {
         if (authMode === 'login') {
           localStorage.setItem('user', JSON.stringify(data.data.user));
           localStorage.setItem('token', data.data.accessToken);
+          if (data.data.refreshToken) {
+            localStorage.setItem('refreshToken', data.data.refreshToken);
+          }
           router.push('/dashboard');
         } else {
           setAuthMode('login');

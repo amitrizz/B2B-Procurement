@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     await RefreshTokenModel.create({
       userId: user.id,
       token: refreshToken,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30d
     });
 
     console.log(`[API] /login - Success: Returning auth response and setting cookies`);
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 86400, // 24h
+      maxAge: 30 * 24 * 60 * 60, // 30d
     });
 
     return response;

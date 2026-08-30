@@ -26,13 +26,18 @@ export function generateAccessToken(payload: { userId: string; role: string; com
 }
 
 export function generateRefreshToken(payload: { userId: string }): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
 }
 
 export function verifyToken(token: string) {
   try {
     return jwt.verify(token, JWT_SECRET) as { userId: string; role: string; companyId: string | null; exp: number };
-  } catch (error) {
+  } catch (error: any) {
+    if (error.name === 'TokenExpiredError') {
+      console.log('🚨 Backend Alert: An Access Token just expired!');
+    } else {
+      console.log('🚨 Backend Alert: Invalid Token provided!', error.message);
+    }
     return null;
   }
 }

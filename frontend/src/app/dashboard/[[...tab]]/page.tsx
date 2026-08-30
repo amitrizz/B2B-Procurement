@@ -20,6 +20,8 @@ import ProfileTab from '../components/ProfileTab';
 import RequisitionsTab from '../components/RequisitionsTab';
 import CatalogTab from '../components/CatalogTab';
 
+let refreshTokenPromise: Promise<any> | null = null;
+
 export default function Dashboard() {
   const router = useRouter();
   const pathname = usePathname();
@@ -113,6 +115,44 @@ export default function Dashboard() {
     window.fetch = async (...args) => {
       const res = await originalFetch(...args);
       if (res.status === 401) {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (refreshToken && !args[0]?.toString().includes('/api/v1/auth/refresh')) {
+          try {
+            if (!refreshTokenPromise) {
+              refreshTokenPromise = originalFetch('/api/v1/auth/refresh', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refreshToken })
+              }).then(res => res.json()).finally(() => {
+                refreshTokenPromise = null;
+              });
+            }
+            
+            const refreshData = await refreshTokenPromise;
+            
+            if (refreshData.success && refreshData.data?.accessToken) {
+              localStorage.setItem('token', refreshData.data.accessToken);
+              if (refreshData.data.refreshToken) {
+                localStorage.setItem('refreshToken', refreshData.data.refreshToken);
+              }
+              // Retry the original request with the new token
+              const newArgs = [...args] as any;
+              if (newArgs[1] && newArgs[1].headers) {
+                if (newArgs[1].headers instanceof Headers) {
+                  newArgs[1].headers.set('Authorization', `Bearer ${refreshData.data.accessToken}`);
+                } else if (typeof newArgs[1].headers === 'object') {
+                  newArgs[1].headers['Authorization'] = `Bearer ${refreshData.data.accessToken}`;
+                }
+              } else if (!newArgs[1]) {
+                newArgs[1] = { headers: { 'Authorization': `Bearer ${refreshData.data.accessToken}` } };
+              }
+              return originalFetch(newArgs[0] as RequestInfo | URL, newArgs[1] as RequestInit);
+            }
+          } catch (e) {
+            console.error('Failed to refresh token', e);
+          }
+        }
+        
         localStorage.clear();
         router.push('/');
       }
