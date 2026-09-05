@@ -1,0 +1,14 @@
+# Render Blueprint — Centrifugo with keys matching backend/.env.prod
+# Deploy: Render Dashboard → New → Blueprint → connect repo, set root to backend/centrifugo
+
+services:
+  - type: web
+    name: b2b-centrifugo
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8000

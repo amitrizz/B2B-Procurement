@@ -1,47 +1,65 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { connectCentrifugo } from '@/lib/centrifugoClient';
+import {
+  connectCentrifugo,
+  getCentrifugoRetryIntervalMs,
+  isCentrifugoConnected,
+} from '@/lib/centrifugoClient';
 import { getCompanyIdFromUser } from '@/lib/userSession';
 
 /**
- * App-level Centrifugo provider.
+ * App-level Centrifugo provider — connects after login and retries until connected.
  */
 export default function CentrifugoProvider({ children }: { children: React.ReactNode }) {
-  const connectKeyRef = useRef<string | null>(null);
+  const sessionKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const tryConnect = () => {
+    let retryTimer: ReturnType<typeof setInterval> | null = null;
+
+    const tryConnect = async () => {
       const token = localStorage.getItem('token');
       const storedUser = localStorage.getItem('user');
-      if (!token || !storedUser) return;
+      if (!token || !storedUser) {
+        sessionKeyRef.current = null;
+        return;
+      }
 
       try {
         const user = JSON.parse(storedUser);
         const companyId = getCompanyIdFromUser(user);
         if (!companyId) return;
 
-        const key = `${companyId}:${token.slice(-8)}`;
-        if (connectKeyRef.current === key) return;
-        connectKeyRef.current = key;
+        const sessionKey = `${companyId}:${token.slice(-8)}`;
+        if (isCentrifugoConnected() && sessionKeyRef.current === sessionKey) return;
 
-        connectCentrifugo(token, companyId);
+        sessionKeyRef.current = sessionKey;
+        await connectCentrifugo(token, companyId);
       } catch {
-        // Invalid JSON in localStorage — ignore
+        sessionKeyRef.current = null;
       }
     };
 
-    tryConnect();
+    void tryConnect();
+
+    retryTimer = setInterval(() => {
+      if (isCentrifugoConnected()) return;
+      sessionKeyRef.current = null;
+      void tryConnect();
+    }, getCentrifugoRetryIntervalMs());
 
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'token' || e.key === 'user') {
-        connectKeyRef.current = null;
-        tryConnect();
+        sessionKeyRef.current = null;
+        void tryConnect();
       }
     };
 
     window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      if (retryTimer) clearInterval(retryTimer);
+    };
   }, []);
 
   return <>{children}</>;

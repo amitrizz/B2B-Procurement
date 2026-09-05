@@ -20,11 +20,7 @@ if (!cmdArgs.length) {
 }
 
 const envFile = path.join(root, `.env.${envName}`);
-if (!fs.existsSync(envFile)) {
-  console.error(`Missing ${envFile}`);
-  console.error(`Copy .env.${envName}.example to .env.${envName} and fill in values.`);
-  process.exit(1);
-}
+const isVercel = Boolean(process.env.VERCEL);
 
 function parseEnv(content) {
   const env = {};
@@ -46,18 +42,29 @@ function parseEnv(content) {
   return env;
 }
 
-const parsed = parseEnv(fs.readFileSync(envFile, 'utf8'));
-
-console.log(`[env] Using ${path.basename(envFile)} (${envName})\n`);
+let parsed = {};
+if (fs.existsSync(envFile)) {
+  parsed = parseEnv(fs.readFileSync(envFile, 'utf8'));
+  console.log(`[env] Loaded ${path.basename(envFile)} (${envName})\n`);
+} else if (isVercel) {
+  console.log(
+    `[env] No ${path.basename(envFile)} on Vercel — using Environment Variables from dashboard (${envName})\n`
+  );
+} else {
+  console.error(`Missing ${envFile}`);
+  console.error(`Copy .env.${envName}.example to .env.${envName} and fill in values.`);
+  console.error('On Vercel, set the same keys in Project → Settings → Environment Variables.');
+  process.exit(1);
+}
 
 const child = spawn(cmdArgs[0], cmdArgs.slice(1), {
   stdio: 'inherit',
   shell: true,
   cwd: root,
   env: {
-    ...process.env,
     ...parsed,
-    APP_ENV_FILE: `.env.${envName}`,
+    ...process.env,
+    APP_ENV_FILE: fs.existsSync(envFile) ? `.env.${envName}` : undefined,
   },
 });
 

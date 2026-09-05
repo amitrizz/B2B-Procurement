@@ -7,23 +7,28 @@ import { shouldDeliverEventToCompany } from './realtimeNotifications';
 interface CentrifugoState {
   instance: Centrifuge | null;
   companyId: string | null;
+  authToken: string | null;
   connecting: boolean;
   connected: boolean;
   listeners: Set<(data: any) => void>;
   lastTransportErrorAt: number;
+  lastConnectAttemptAt: number;
 }
 
 const KEY = '__centrifugo_state';
+const RETRY_MS = 15000;
 
 function getState(): CentrifugoState {
   if (!(globalThis as any)[KEY]) {
     (globalThis as any)[KEY] = {
       instance: null,
       companyId: null,
+      authToken: null,
       connecting: false,
       connected: false,
       listeners: new Set(),
       lastTransportErrorAt: 0,
+      lastConnectAttemptAt: 0,
     };
   }
   return (globalThis as any)[KEY];
@@ -75,61 +80,33 @@ function destroyInstance(state: CentrifugoState) {
   }
   state.instance = null;
   state.companyId = null;
+  state.authToken = null;
   state.connected = false;
 }
 
-function waitForConnection(centrifuge: Centrifuge, timeoutMs: number): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (centrifuge.state === 'connected') {
-      resolve();
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      cleanup();
-      reject(new Error('Centrifugo connection timed out'));
-    }, timeoutMs);
-
-    const onConnected = () => {
-      cleanup();
-      resolve();
-    };
-
-    const onError = (ctx: unknown) => {
-      if (isBenignTransportError(ctx)) return;
-      cleanup();
-      reject((ctx as { error?: unknown })?.error ?? ctx);
-    };
-
-    const cleanup = () => {
-      clearTimeout(timer);
-      centrifuge.off('connected', onConnected);
-      centrifuge.off('error', onError);
-    };
-
-    centrifuge.on('connected', onConnected);
-    centrifuge.on('error', onError);
-  });
-}
-
-export async function connectCentrifugo(authToken: string, companyId: string) {
+export async function connectCentrifugo(authToken: string, companyId: string): Promise<boolean> {
   const state = getState();
-  const centrifugoUrl = process.env.NEXT_PUBLIC_CENTRIFUGO_URL;
+  const centrifugoUrl = process.env.NEXT_PUBLIC_CENTRIFUGO_URL?.trim();
 
   if (!centrifugoUrl) {
     console.warn('[CentrifugoClient] NEXT_PUBLIC_CENTRIFUGO_URL is not set');
-    return;
+    return false;
   }
 
-  if (state.connected && state.instance && state.companyId === companyId) return;
-  if (state.connecting) return;
+  if (state.connected && state.instance && state.companyId === companyId && state.authToken === authToken) {
+    return true;
+  }
+  if (state.connecting) return state.connected;
 
-  if (state.instance) {
+  const now = Date.now();
+  if (now - state.lastConnectAttemptAt < 2000) return state.connected;
+  state.lastConnectAttemptAt = now;
+
+  if (state.instance && (state.companyId !== companyId || state.authToken !== authToken)) {
     destroyInstance(state);
   }
 
   state.connecting = true;
-  let centrifuge: Centrifuge | null = null;
 
   try {
     const res = await fetch('/api/v1/realtime/token', {
@@ -138,39 +115,40 @@ export async function connectCentrifugo(authToken: string, companyId: string) {
     const data = await res.json();
 
     if (!data.success || !data.token) {
-      throw new Error(`Backend returned: ${JSON.stringify(data)}`);
+      throw new Error(data.message || 'Failed to get realtime token');
     }
 
-    centrifuge = new Centrifuge(centrifugoUrl, {
-      token: data.token,
-      minReconnectDelay: 1000,
-      maxReconnectDelay: 20000,
-    });
+    let centrifuge = state.instance;
+    if (!centrifuge) {
+      centrifuge = new Centrifuge(centrifugoUrl, {
+        token: data.token,
+        minReconnectDelay: 1000,
+        maxReconnectDelay: 20000,
+      });
 
-    centrifuge.on('connected', () => {
-      state.connected = true;
-    });
-    centrifuge.on('disconnected', () => {
-      state.connected = false;
-    });
-    centrifuge.on('error', (err) => logTransportError(err));
+      centrifuge.on('connected', () => {
+        state.connected = true;
+      });
+      centrifuge.on('disconnected', () => {
+        state.connected = false;
+      });
+      centrifuge.on('error', (err) => logTransportError(err));
+
+      state.instance = centrifuge;
+      state.companyId = companyId;
+      state.authToken = authToken;
+    } else {
+      centrifuge.setToken(data.token);
+    }
 
     attachSubscription(centrifuge, companyId);
     centrifuge.connect();
-    await waitForConnection(centrifuge, 8000);
 
-    state.instance = centrifuge;
-    state.companyId = companyId;
+    return true;
   } catch (err) {
     logTransportError(err);
-    if (centrifuge) {
-      try {
-        centrifuge.disconnect();
-      } catch {
-        // ignore
-      }
-    }
     destroyInstance(state);
+    return false;
   } finally {
     state.connecting = false;
   }
@@ -182,4 +160,12 @@ export function onCentrifugoEvent(callback: (data: any) => void): () => void {
   return () => {
     state.listeners.delete(callback);
   };
+}
+
+export function isCentrifugoConnected(): boolean {
+  return getState().connected;
+}
+
+export function getCentrifugoRetryIntervalMs(): number {
+  return RETRY_MS;
 }

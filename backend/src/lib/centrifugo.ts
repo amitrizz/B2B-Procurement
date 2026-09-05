@@ -11,7 +11,7 @@ export function generateCentrifugoToken(userId: string) {
 }
 
 export async function publishToCentrifugo(channel: string, data: any) {
-  const CENTRIFUGO_URL = process.env.CENTRIFUGO_URL || 'http://localhost:8000';
+  const CENTRIFUGO_URL = (process.env.CENTRIFUGO_URL || 'http://localhost:8000').replace(/\/$/, '');
   const CENTRIFUGO_API_KEY = process.env.CENTRIFUGO_API_KEY || '';
   
   if (!CENTRIFUGO_API_KEY) {
@@ -36,7 +36,8 @@ export async function publishToCentrifugo(channel: string, data: any) {
     });
 
     if (!response.ok) {
-      console.error('[Centrifugo] publish failed:', await response.text());
+      const errText = await response.text();
+      console.error(`[Centrifugo] publish failed (${response.status}):`, errText || response.statusText);
       return false;
     }
     console.log(`[Centrifugo] successfully published event to channel: ${channel}`);
