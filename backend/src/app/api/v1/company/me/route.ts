@@ -58,14 +58,7 @@ export async function PUT(req: NextRequest) {
     const user = await getAuthUser(req);
     if (!user || !user.companyId) return authErrorResponse();
 
-    const { name, gstin, pan, phone, addressLine1, city, state, pincode } = await req.json();
-
-    if (!addressLine1 || !city || !state || !pincode) {
-      return console.log(`[API Response] /api/v1/company/me - Sending response`), NextResponse.json(
-        { success: false, code: 'BAD_REQUEST', message: 'Full address is required' },
-        { status: 400 }
-      );
-    }
+    const { name, gstin, pan, phone, address } = await req.json();
 
     await db();
     const { Company, CompanyAddress } = await import('@/models/Company');
@@ -130,29 +123,6 @@ export async function PUT(req: NextRequest) {
         },
         { new: true, session }
       ).lean() as any;
-
-      // Upsert primary address
-      const existingAddress = await CompanyAddress.findOne({
-        companyId: user.companyId,
-        isPrimary: true,
-      }).session(session).lean() as any;
-
-      if (existingAddress) {
-        await CompanyAddress.findByIdAndUpdate(
-          existingAddress._id,
-          { addressLine1, city, state, pincode },
-          { session }
-        );
-      } else {
-        await CompanyAddress.create([{
-          companyId: user.companyId,
-          addressLine1,
-          city,
-          state,
-          pincode,
-          isPrimary: true,
-        }], { session });
-      }
 
       await session.commitTransaction();
     } catch (err) {

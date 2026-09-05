@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getAuthUser, authErrorResponse } from '@/lib/auth';
-import { computeGst, getHsnTaxRate } from '@/lib/gst';
+import { computePlatformPricing } from '@/lib/platformPricing';
+import { getPlatformBilling } from '@/lib/platformBilling';
 import mongoose from 'mongoose';
 
 type Params = {
@@ -51,6 +52,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     const buyerAddress = await CompanyAddress.findOne({
       companyId: user.companyId, isPrimary: true
     }).lean() as any;
+
+    const platform = await getPlatformBilling();
 
     const session = await mongoose.startSession();
     let purchaseOrders: any[] = [];
@@ -137,14 +140,11 @@ export async function POST(req: NextRequest, { params }: Params) {
         const poNumber = 'PO-' + Math.floor(100000 + Math.random() * 900000);
 
         let totalBase = 0;
-        let totalTax = 0;
-        const commissionRate = 0.05; // 5% platform commission
+        const commissionRate = 0.05;
 
         const supplier = itemsWon[0].supplierCompany;
         const supplierAddresses = itemsWon[0].supplierAddresses;
         const supplierAddress = supplierAddresses.find((addr: any) => addr.isPrimary) || supplierAddresses[0];
-
-        const isSameState = buyerAddress && supplierAddress && (buyerAddress.state === supplierAddress.state);
 
         const poItemsData = itemsWon.map(item => {
           const awardQty = Number(item.quantity) || Number(item.bid.quantity);
@@ -152,23 +152,14 @@ export async function POST(req: NextRequest, { params }: Params) {
           const baseAmount = bidUnitPrice * awardQty;
           totalBase += baseAmount;
 
-          const taxRateBps = getHsnTaxRate(item.rfqItem.hsnCode); 
-          const { cgst, sgst, igst, taxTotal } = computeGst({
-            taxablePaise: baseAmount,
-            shipToState: buyerAddress ? buyerAddress.state : 'Maharashtra',
-            supplierState: supplierAddress ? supplierAddress.state : 'Maharashtra',
-            taxRateBps
-          });
-          totalTax += taxTotal;
-
           return {
             rfqItemId: item.bid.rfqItemId,
             bidId: item.bid._id,
             quantity: awardQty,
-            unitPrice: bidUnitPrice, 
+            unitPrice: bidUnitPrice,
             materialOption: item.materialOption,
-            taxRateBps,
-            taxAmount: taxTotal,
+            taxRateBps: 0,
+            taxAmount: 0,
             priceWithoutMaterial: item.bid.priceWithoutMaterial / Number(item.bid.quantity),
             priceWithMaterial: item.bid.priceWithMaterial / Number(item.bid.quantity),
             finalUnitPrice: bidUnitPrice,
@@ -176,8 +167,12 @@ export async function POST(req: NextRequest, { params }: Params) {
           };
         });
 
-        const commissionAmount = totalBase * commissionRate;
-        const totalAmount = totalBase + totalTax + commissionAmount;
+        const pricing = computePlatformPricing({
+          goodsTaxablePaise: totalBase,
+          commissionRate,
+          shipToState: buyerAddress?.state || 'Maharashtra',
+          platformState: platform.state,
+        });
 
         const poDoc = await PurchaseOrder.create([{
           poNumber,
@@ -185,9 +180,13 @@ export async function POST(req: NextRequest, { params }: Params) {
           buyerCompanyId: user.companyId,
           supplierCompanyId: supplierId,
           status: 'CREATED',
-          totalAmount,
-          taxAmount: totalTax,
-          commissionAmount,
+          totalAmount: pricing.buyerTotal,
+          taxAmount: pricing.taxTotal,
+          commissionAmount: pricing.commissionAmount,
+          placeOfSupplyState: buyerAddress?.state || platform.state,
+          cgstAmount: pricing.cgstAmount,
+          sgstAmount: pricing.sgstAmount,
+          igstAmount: pricing.igstAmount,
           deliveryCharge: 0,
         }], { session });
 
@@ -195,7 +194,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
         const poItemsWithPoId = poItemsData.map(pi => ({
            ...pi,
-           poId: createdPo._id
+           purchaseOrderId: createdPo._id
         }));
 
         await PurchaseOrderItem.insertMany(poItemsWithPoId, { session });

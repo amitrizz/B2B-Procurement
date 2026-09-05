@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getAuthUser, authErrorResponse } from '@/lib/auth';
-import { computeGst } from '@/lib/gst';
+import { getPlatformBilling } from '@/lib/platformBilling';
+import { computePlatformPricing } from '@/lib/platformPricing';
 import { nextNumber } from '@/lib/sequence';
 import mongoose from 'mongoose';
 
@@ -26,7 +27,6 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { Bid } = await import('@/models/Bid');
     const { CompanyAddress, Company } = await import('@/models/Company');
     const { PurchaseOrder, PurchaseOrderItem } = await import('@/models/PurchaseOrder');
-    const { Invoice, InvoiceLine, LedgerEntry } = await import('@/models/Finance');
 
     const rfq = await RFQ.findById(rfqId).lean() as any;
     const rfqItems = rfq ? await RFQItem.find({ rfqId: rfq._id }).lean() as any[] : [];
@@ -72,13 +72,13 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     const baseAmount = unitPrice * bid.quantity;
-    const gstInfo = computeGst({
-      taxablePaise: baseAmount,
-      taxRateBps: 1800,
+    const platform = await getPlatformBilling();
+    const pricing = computePlatformPricing({
+      goodsTaxablePaise: baseAmount,
+      commissionRate: 0.05,
       shipToState: buyerState,
-      supplierState
+      platformState: platform.state,
     });
-    const totalAmount = baseAmount + gstInfo.cgst + gstInfo.sgst + gstInfo.igst;
 
     const poNumber = await nextNumber('PO');
     
@@ -108,10 +108,14 @@ export async function POST(req: NextRequest, { params }: Params) {
         rfqId,
         buyerCompanyId: user.companyId,
         supplierCompanyId: bid.supplierCompanyId,
-        status: 'CREATED', // was AWAITING_ACCEPTANCE in schema/original code, mapped appropriately
-        totalAmount,
-        taxAmount: gstInfo.cgst + gstInfo.sgst + gstInfo.igst,
-        commissionAmount: 0,
+        status: 'CREATED',
+        totalAmount: pricing.buyerTotal,
+        taxAmount: pricing.taxTotal,
+        commissionAmount: pricing.commissionAmount,
+        placeOfSupplyState: buyerState,
+        cgstAmount: pricing.cgstAmount,
+        sgstAmount: pricing.sgstAmount,
+        igstAmount: pricing.igstAmount,
         deliveryCharge: 0,
       }], { session });
 
@@ -119,14 +123,14 @@ export async function POST(req: NextRequest, { params }: Params) {
 
       // Create PO Line
       await PurchaseOrderItem.create([{
-        poId: po._id,
+        purchaseOrderId: po._id,
         rfqItemId: bid.rfqItemId,
         bidId: bid._id,
         quantity: bid.quantity,
         unitPrice,
         materialOption: finalMaterialPreference,
-        taxRateBps: 1800,
-        taxAmount: gstInfo.cgst + gstInfo.sgst + gstInfo.igst,
+        taxRateBps: 0,
+        taxAmount: 0,
         priceWithoutMaterial: bid.priceWithoutMaterial,
         priceWithMaterial: bid.priceWithMaterial,
         finalUnitPrice: unitPrice,
@@ -143,52 +147,6 @@ export async function POST(req: NextRequest, { params }: Params) {
         { $set: { status: newRfqStatus } },
         { session }
       );
-
-      // Platform Commission logic
-      // Assuming platform is in Maharashtra (MH) for inter-state calculation
-      const platformState = 'Maharashtra';
-      const commissionBase = Math.round(baseAmount * 0.05);
-      const commissionGst = computeGst({
-        taxablePaise: commissionBase,
-        taxRateBps: 1800,
-        shipToState: platformState,
-        supplierState
-      });
-      const commissionTotal = commissionBase + commissionGst.cgst + commissionGst.sgst + commissionGst.igst;
-
-      const invoiceNumber = await nextNumber('INV');
-      
-      const invoiceDoc = await Invoice.create([{
-        invoiceNumber,
-        purchaseOrderId: po._id,
-        type: 'COMMISSION',
-        status: 'DRAFT',
-        payeeCompanyId: bid.supplierCompanyId,
-        payerCompanyId: bid.supplierCompanyId, 
-        baseAmount: commissionBase,
-        cgst: commissionGst.cgst,
-        sgst: commissionGst.sgst,
-        igst: commissionGst.igst,
-        totalAmount: commissionTotal,
-      }], { session });
-
-      const invoice = invoiceDoc[0];
-
-      await InvoiceLine.create([{
-        invoiceId: invoice._id,
-        description: `Platform Fee (5%) for PO ${poNumber}`,
-        quantity: 1,
-        unitPrice: commissionBase,
-        totalPrice: commissionBase,
-      }], { session });
-
-      await LedgerEntry.create([{
-        companyId: bid.supplierCompanyId,
-        type: 'COMMISSION_FEE',
-        amount: -commissionTotal, // debit
-        referenceId: invoice._id,
-        referenceType: 'INVOICE'
-      }], { session });
 
       await session.commitTransaction();
       result = po.toObject();

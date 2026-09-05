@@ -41,7 +41,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
-    const allowedStatuses = ['PROCESSING', 'PROCESSING_20', 'PROCESSING_40', 'PROCESSING_60'];
+    const allowedStatuses = ['CREATED', 'PROCESSING_20', 'PROCESSING_40', 'PROCESSING_60'];
     if (!allowedStatuses.includes(order.status)) {
       return console.log(`[API Response] /api/v1/orders/[id]/start-processing - Sending response`), NextResponse.json(
         { success: false, code: 'INVALID_STATUS', message: 'Order cannot progress further using this action' },
@@ -52,25 +52,16 @@ export async function POST(req: NextRequest, { params }: Params) {
     let nextStatus = 'PROCESSING_20';
     let updateData: any = {};
 
-    if (order.status === 'PROCESSING') {
+    if (order.status === 'CREATED') {
       nextStatus = 'PROCESSING_20';
       updateData.workImage20 = workImageId;
     } else if (order.status === 'PROCESSING_20') {
-      if (!['20', '40', '60', '80'].includes(order.milestoneApproved || '')) {
-        return console.log(`[API Response] /api/v1/orders/[id]/start-processing - Sending response`), NextResponse.json({ success: false, code: 'APPROVAL_REQUIRED', message: 'Buyer must approve 20% milestone before advancing' }, { status: 403 });
-      }
       nextStatus = 'PROCESSING_40';
       updateData.workImage40 = workImageId;
     } else if (order.status === 'PROCESSING_40') {
-      if (!['40', '60', '80'].includes(order.milestoneApproved || '')) {
-         return console.log(`[API Response] /api/v1/orders/[id]/start-processing - Sending response`), NextResponse.json({ success: false, code: 'APPROVAL_REQUIRED', message: 'Buyer must approve 40% milestone before advancing' }, { status: 403 });
-      }
       nextStatus = 'PROCESSING_60';
       updateData.workImage60 = workImageId;
     } else if (order.status === 'PROCESSING_60') {
-      if (!['60', '80'].includes(order.milestoneApproved || '')) {
-         return console.log(`[API Response] /api/v1/orders/[id]/start-processing - Sending response`), NextResponse.json({ success: false, code: 'APPROVAL_REQUIRED', message: 'Buyer must approve 60% milestone before advancing' }, { status: 403 });
-      }
       nextStatus = 'PROCESSING_80';
       updateData.workImage80 = workImageId;
     }

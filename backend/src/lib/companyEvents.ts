@@ -1,4 +1,4 @@
-import { eventEmitter } from './eventEmitter';
+import { publishToCentrifugo } from './centrifugo';
 import { sendNotificationToUser } from './webpush';
 import { db } from './db';
 
@@ -7,10 +7,11 @@ import { db } from './db';
  */
 export async function broadcastCompanyUpdate(companyId: string, eventType: string, message: string) {
   try {
-    // 1. Emit SSE for connected clients via companyId
-    eventEmitter.emit('app_event', {
-      companyId: companyId.toString(),
-      type: eventType,
+    console.log(`[Centrifugo] Broadcasting company update for company ${companyId}`);
+    // 1. Emit to Centrifugo
+    await publishToCentrifugo('global_updates', {
+      type: 'db_change',
+      targetCompanyIds: [companyId.toString()],
       message
     });
 

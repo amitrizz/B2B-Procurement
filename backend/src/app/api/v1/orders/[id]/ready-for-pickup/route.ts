@@ -78,17 +78,23 @@ export async function POST(req: NextRequest, { params }: Params) {
       
       const updatedOrder = updatedOrderDoc ? { ...updatedOrderDoc, id: updatedOrderDoc._id.toString() } : null;
 
-      // Generate 6 digit OTP
+      // Generate 6 digit OTPs for Pickup and Delivery
       const crypto = await import('crypto');
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+      const pickupOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      const pickupOtpHash = crypto.createHash('sha256').update(pickupOtp).digest('hex');
+      
+      const deliveryOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      const deliveryOtpHash = crypto.createHash('sha256').update(deliveryOtp).digest('hex');
 
       const deliveryDoc = await DeliveryOrder.create([{
         deliveryNumber,
         purchaseOrderId: id,
         status: 'CREATED',
         deliveryCharge: 0,
-        otpHash,
+        pickupOtp,
+        pickupOtpHash,
+        deliveryOtp,
+        deliveryOtpHash,
       }], { session });
       
       const delivery = deliveryDoc[0];
@@ -98,8 +104,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       result = { 
         updatedOrder, 
         delivery: { ...delivery.toObject(), id: delivery._id.toString() }, 
-        otp 
-      }; // Return OTP in response so supplier can see it and give to transporter
+        pickupOtp,
+        deliveryOtp 
+      };
     } catch (err) {
       await session.abortTransaction();
       throw err;
@@ -112,10 +119,25 @@ export async function POST(req: NextRequest, { params }: Params) {
       await broadcastOrderUpdate(result.updatedOrder, 'order_updated', `Order ${order.poNumber || order._id} is ready for pickup`);
     }
 
+    // Supplier sees pickup OTP only; buyer gets delivery OTP via orders API
+    const supplierResult = result
+      ? {
+          updatedOrder: result.updatedOrder,
+          delivery: result.delivery
+            ? {
+                id: result.delivery.id,
+                deliveryNumber: result.delivery.deliveryNumber,
+                status: result.delivery.status,
+              }
+            : null,
+          pickupOtp: result.pickupOtp,
+        }
+      : null;
+
     return console.log(`[API Response] /api/v1/orders/[id]/ready-for-pickup - Sending response`), NextResponse.json({
       success: true,
-      message: 'Order marked ready for pickup. Delivery order generated.',
-      data: result,
+      message: 'Order marked ready for pickup. Share the Pickup OTP with your transporter.',
+      data: supplierResult,
     });
   } catch (error: any) {
     console.error('Ready for pickup error:', error);

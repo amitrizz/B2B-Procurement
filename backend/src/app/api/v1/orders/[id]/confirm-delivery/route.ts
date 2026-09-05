@@ -36,13 +36,39 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
+    if (order.status === 'COMPLETED') {
+      return NextResponse.json(
+        { success: false, code: 'ALREADY_COMPLETED', message: 'Delivery has already been confirmed for this order' },
+        { status: 400 }
+      );
+    }
+
+    if (order.status !== 'DELIVERED') {
+      return NextResponse.json(
+        {
+          success: false,
+          code: 'INVALID_STATUS',
+          message: 'Order must be DELIVERED by the transporter before you can confirm GRN',
+        },
+        { status: 400 }
+      );
+    }
+
     const body = await req.json().catch(() => ({}));
-    const acceptedQty = body.acceptedQty || 1;
-    const rejectedQty = body.rejectedQty || 0;
+    const acceptedQty = body.acceptedQty ?? 1;
+    const rejectedQty = body.rejectedQty ?? 0;
     const remarks = body.remarks || '';
 
     const { nextNumber } = await import('@/lib/sequence');
     const grnNumber = await nextNumber('GRN');
+
+    const decision =
+      rejectedQty > 0 ? 'ACCEPT_WITH_DEVIATION' : 'ACCEPT';
+    const notesParts = [grnNumber];
+    if (acceptedQty !== 1) notesParts.push(`accepted qty: ${acceptedQty}`);
+    if (rejectedQty > 0) notesParts.push(`rejected qty: ${rejectedQty}`);
+    if (remarks) notesParts.push(remarks);
+    const notes = notesParts.join(' — ');
 
     const session = await mongoose.startSession();
     let updatedOrder: any = null;
@@ -60,10 +86,9 @@ export async function POST(req: NextRequest, { params }: Params) {
 
       await GoodsReceipt.create([{
         purchaseOrderId: id,
-        grnNumber,
-        acceptedQty,
-        rejectedQty,
-        remarks,
+        decision,
+        notes,
+        createdByUserId: user.id,
       }], { session });
 
       await session.commitTransaction();
@@ -90,7 +115,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     return console.log(`[API Response] /api/v1/orders/[id]/confirm-delivery - Sending response`), NextResponse.json({
       success: true,
       message: 'Delivery confirmed and order completed',
-      data: updatedOrder,
+      data: { order: updatedOrder, grnNumber },
     });
   } catch (error: any) {
     console.error('Confirm delivery error:', error);

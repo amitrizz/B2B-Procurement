@@ -20,7 +20,12 @@ const DeliveryOrderSchema = new Schema({
   pickupAddressSnapshot: { type: String },
   dropAddressSnapshot: { type: String },
   podFileId: { type: String },
-  otpHash: { type: String }
+  otpHash: { type: String },
+  otp: { type: String }, // Legacy Plaintext OTP
+  pickupOtp: { type: String },
+  pickupOtpHash: { type: String },
+  deliveryOtp: { type: String },
+  deliveryOtpHash: { type: String }
 }, { timestamps: { createdAt: true, updatedAt: false } });
 
 export const DeliveryOrder = mongoose.models.DeliveryOrder || mongoose.model('DeliveryOrder', DeliveryOrderSchema);

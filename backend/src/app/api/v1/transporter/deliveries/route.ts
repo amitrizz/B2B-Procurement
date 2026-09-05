@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getAuthUser, authErrorResponse } from '@/lib/auth';
+import { sanitizeDeliveryOrder } from '@/lib/deliveryOrderSanitize';
 import mongoose from 'mongoose';
 
 export async function GET(req: NextRequest) {
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
       { $sort: { createdAt: -1 } },
       {
         $lookup: {
-          from: 'PurchaseOrder',
+          from: 'purchaseorders',
           localField: 'purchaseOrderId',
           foreignField: '_id',
           as: 'purchaseOrder'
@@ -40,7 +41,16 @@ export async function GET(req: NextRequest) {
       { $unwind: { path: '$purchaseOrder', preserveNullAndEmptyArrays: true } },
     ];
 
-    if (user.role !== 'PLATFORM_ADMIN') {
+    if (user.role === 'TRANSPORTER') {
+      pipeline.push({
+        $match: {
+          $or: [
+            { status: 'CREATED' },
+            { transporterId: new mongoose.Types.ObjectId(user.companyId) }
+          ]
+        }
+      });
+    } else if (user.role !== 'PLATFORM_ADMIN') {
       pipeline.push({
         $match: {
           $or: [
@@ -54,7 +64,7 @@ export async function GET(req: NextRequest) {
     pipeline.push(
       {
         $lookup: {
-          from: 'Company',
+          from: 'companies',
           localField: 'purchaseOrder.buyerCompanyId',
           foreignField: '_id',
           as: 'purchaseOrder.buyerCompany'
@@ -67,7 +77,7 @@ export async function GET(req: NextRequest) {
       },
       {
         $lookup: {
-          from: 'Company',
+          from: 'companies',
           localField: 'purchaseOrder.supplierCompanyId',
           foreignField: '_id',
           as: 'purchaseOrder.supplierCompany'
@@ -80,7 +90,23 @@ export async function GET(req: NextRequest) {
       },
       {
         $lookup: {
-          from: 'Company',
+          from: 'companyaddresses',
+          localField: 'purchaseOrder.buyerCompanyId',
+          foreignField: 'companyId',
+          as: 'buyerAddresses'
+        }
+      },
+      {
+        $lookup: {
+          from: 'companyaddresses',
+          localField: 'purchaseOrder.supplierCompanyId',
+          foreignField: 'companyId',
+          as: 'supplierAddresses'
+        }
+      },
+      {
+        $lookup: {
+          from: 'companies',
           localField: 'transporterId',
           foreignField: '_id',
           as: 'transporter'
@@ -95,17 +121,26 @@ export async function GET(req: NextRequest) {
 
     const deliveriesDoc = await DeliveryOrder.aggregate(pipeline);
 
-    const deliveries = deliveriesDoc.map((d: any) => ({
+    const formatAddress = (addresses: any[]) => {
+      const primary = addresses?.find(a => a.isPrimary) || addresses?.[0];
+      if (!primary) return null;
+      return `${primary.addressLine1}, ${primary.city}, ${primary.state} - ${primary.pincode}`;
+    };
+
+    const deliveries = deliveriesDoc.map((d: any) => {
+      const formatted = {
       ...d,
-      id: d._id.toString(),
-      purchaseOrder: d.purchaseOrder ? {
+      id: d._id?.toString(),
+      purchaseOrder: (d.purchaseOrder && d.purchaseOrder._id) ? {
         ...d.purchaseOrder,
         id: d.purchaseOrder._id.toString(),
-        buyerCompany: d.purchaseOrder.buyerCompany ? { name: d.purchaseOrder.buyerCompany.name } : null,
-        supplierCompany: d.purchaseOrder.supplierCompany ? { name: d.purchaseOrder.supplierCompany.name } : null
+        buyerCompany: d.purchaseOrder.buyerCompany ? { name: d.purchaseOrder.buyerCompany.name, address: formatAddress(d.buyerAddresses) } : null,
+        supplierCompany: d.purchaseOrder.supplierCompany ? { name: d.purchaseOrder.supplierCompany.name, address: formatAddress(d.supplierAddresses) } : null
       } : null,
-      transporter: d.transporter ? { ...d.transporter, id: d.transporter._id.toString() } : null
-    }));
+      transporter: (d.transporter && d.transporter._id) ? { ...d.transporter, id: d.transporter._id.toString() } : null
+    };
+      return sanitizeDeliveryOrder(formatted, { role: user.role });
+    });
 
     return console.log(`[API Response] /api/v1/transporter/deliveries - Sending response`), NextResponse.json({
       success: true,

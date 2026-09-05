@@ -35,11 +35,21 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     const { id: rfqId, rfqItemId } = await params;
-    const { materialOptionPreference, estimatedTimeDays, terms } = await req.json();
-    let { priceWithoutMaterial, priceWithMaterial } = await req.json();
+    const body = await req.json();
+    const {
+      materialOptionPreference,
+      estimatedTimeDays,
+      terms,
+      priceWithoutMaterial: rawPriceWithoutMaterial,
+      priceWithMaterial: rawPriceWithMaterial,
+    } = body;
 
-    priceWithoutMaterial = priceWithoutMaterial ? rupeesToPaise(Number(priceWithoutMaterial)) : 0;
-    priceWithMaterial = priceWithMaterial ? rupeesToPaise(Number(priceWithMaterial)) : 0;
+    let priceWithoutMaterial = rawPriceWithoutMaterial
+      ? rupeesToPaise(Number(rawPriceWithoutMaterial))
+      : 0;
+    let priceWithMaterial = rawPriceWithMaterial
+      ? rupeesToPaise(Number(rawPriceWithMaterial))
+      : 0;
 
     await db();
     const { RFQ, RFQItem } = await import('@/models/RFQ');

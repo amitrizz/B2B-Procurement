@@ -30,7 +30,34 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     const data: any = {};
-    if (status) data.status = status;
+    if (status) {
+      if (status === 'PICKED_UP' && delivery.pickupOtpHash) {
+        return NextResponse.json(
+          {
+            success: false,
+            code: 'OTP_REQUIRED',
+            message: 'Pickup OTP verification required. Use verify-otp with type PICKUP.',
+          },
+          { status: 400 }
+        );
+      }
+      if (status === 'DELIVERED' && (delivery.deliveryOtpHash || delivery.otpHash)) {
+        return NextResponse.json(
+          {
+            success: false,
+            code: 'OTP_REQUIRED',
+            message: 'Delivery OTP verification required. Use verify-otp with type DELIVERY.',
+          },
+          { status: 400 }
+        );
+      }
+
+      data.status = status;
+      // If a Transporter is accepting an open delivery, assign it to them
+      if (status === 'ACCEPTED' && user.role === 'TRANSPORTER' && user.companyId) {
+        data.transporterId = new mongoose.Types.ObjectId(user.companyId);
+      }
+    }
     if (deliveryCharge !== undefined) data.deliveryCharge = deliveryCharge;
     if (transporterId) data.transporterId = transporterId;
 
@@ -68,6 +95,18 @@ export async function POST(req: NextRequest, { params }: Params) {
       throw err;
     } finally {
       session.endSession();
+    }
+
+    if (updatedDelivery && updatedDelivery.purchaseOrderId) {
+      const purchaseOrder = await PurchaseOrder.findById(updatedDelivery.purchaseOrderId).lean() as any;
+      if (purchaseOrder) {
+        const { broadcastOrderUpdate } = await import('@/lib/orderEvents');
+        await broadcastOrderUpdate(
+          purchaseOrder,
+          'delivery_updated',
+          `Delivery status updated to ${status} for order ${purchaseOrder.poNumber || purchaseOrder._id}.`
+        );
+      }
     }
 
     return console.log(`[API Response] /api/v1/transporter/deliveries/[id] - Sending response`), NextResponse.json({

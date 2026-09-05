@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getAuthUser, authErrorResponse } from '@/lib/auth';
 import jwt from 'jsonwebtoken';
+import { getAppConfig } from '@/lib/appConfig';
 
 export async function POST(req: NextRequest) {
     console.log(`[API] ${req.method} ${req.nextUrl?.pathname || req.url}`);
@@ -41,8 +42,9 @@ export async function POST(req: NextRequest) {
       { expiresIn: '7d' }
     );
 
+    const { frontendUrl } = getAppConfig();
     // In a real app, send email here
-    console.log(`Invite link: http://localhost:3000/?inviteToken=${token}`);
+    console.log(`Invite link: ${frontendUrl}/?inviteToken=${token}`);
 
     return console.log(`[API Response] /api/v1/company/invites - Sending response`), NextResponse.json({
       success: true,

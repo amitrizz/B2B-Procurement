@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getAuthUser, authErrorResponse } from '@/lib/auth';
-import { computeGst, getHsnTaxRate } from '@/lib/gst';
+import { getPlatformBilling } from '@/lib/platformBilling';
+import { computePlatformPricing } from '@/lib/platformPricing';
 import mongoose from 'mongoose';
 
 export async function POST(req: NextRequest) {
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
     const supplierState = supplierAddress.state;
     const buyerState = primaryAddress.state;
 
-    let totalAmount = 0;
+    let goodsTotal = 0;
     let poItems = [];
 
     for (const item of catalogItems) {
@@ -74,39 +75,32 @@ export async function POST(req: NextRequest) {
       }
 
       const lineTotal = dbItem.unitPrice * item.quantity;
-      totalAmount += lineTotal;
+      goodsTotal += lineTotal;
 
       poItems.push({
         componentName: dbItem.name,
         quantity: item.quantity,
+        unitPrice: dbItem.unitPrice,
         priceWithoutMaterial: dbItem.unitPrice,
         priceWithMaterial: dbItem.unitPrice,
         finalUnitPrice: dbItem.unitPrice,
         hsnCode: dbItem.hsnCode,
-        taxRateBps: getHsnTaxRate(dbItem.hsnCode)
+        taxRateBps: 0,
+        taxAmount: 0,
       });
     }
 
     const { PlatformConfig } = await import('@/models/Platform');
     const configDoc = await PlatformConfig.findOne().lean() as any;
-    const commissionBps = configDoc?.commissionBps || 100;
-    const commissionAmount = Math.round((totalAmount * commissionBps) / 10000);
+    const commissionBps = configDoc?.commissionBps || 500;
+    const platform = await getPlatformBilling();
 
-    // Compute GST for the whole order
-    let totalCgst = 0, totalSgst = 0, totalIgst = 0, totalTax = 0;
-    for (const item of poItems) {
-       const lineTotal = item.quantity * item.finalUnitPrice;
-       const { cgst, sgst, igst, taxTotal } = computeGst({
-         taxablePaise: lineTotal,
-         shipToState: buyerState,
-         supplierState: supplierState,
-         taxRateBps: item.taxRateBps
-       });
-       totalCgst += cgst;
-       totalSgst += sgst;
-       totalIgst += igst;
-       totalTax += taxTotal;
-    }
+    const pricing = computePlatformPricing({
+      goodsTaxablePaise: goodsTotal,
+      commissionBps,
+      shipToState: buyerState,
+      platformState: platform.state,
+    });
 
     const { nextNumber } = await import('@/lib/sequence');
     const poNumber = await nextNumber('PO');
@@ -123,28 +117,31 @@ export async function POST(req: NextRequest) {
         buyerCompanyId: user.companyId,
         supplierCompanyId,
         status: 'AWAITING_ACCEPTANCE',
-        totalAmount,
-        taxAmount: totalTax,
-        commissionAmount,
+        totalAmount: pricing.buyerTotal,
+        taxAmount: pricing.taxTotal,
+        commissionAmount: pricing.commissionAmount,
         placeOfSupplyState: buyerState,
-        cgstAmount: totalCgst,
-        sgstAmount: totalSgst,
-        igstAmount: totalIgst,
-        orderType: 'PRODUCTION', // default for catalog
-        paymentTermsDays: 30, // default
+        cgstAmount: pricing.cgstAmount,
+        sgstAmount: pricing.sgstAmount,
+        igstAmount: pricing.igstAmount,
+        orderType: 'PRODUCTION',
+        paymentTermsDays: 30,
         escrowRequired: true,
       }], { session });
 
       po = poDocs[0];
 
       const poItemsDocs = poItems.map(pi => ({
-        poId: po._id,
+        purchaseOrderId: po._id,
         componentName: pi.componentName,
         quantity: pi.quantity,
+        unitPrice: pi.finalUnitPrice,
         priceWithoutMaterial: pi.priceWithoutMaterial,
         priceWithMaterial: pi.priceWithMaterial,
         finalUnitPrice: pi.finalUnitPrice,
-        hsnCode: pi.hsnCode
+        hsnCode: pi.hsnCode,
+        taxRateBps: 0,
+        taxAmount: 0,
       }));
 
       itemsResult = await PurchaseOrderItem.insertMany(poItemsDocs, { session });

@@ -1,4 +1,4 @@
-import { eventEmitter } from './eventEmitter';
+import { publishToCentrifugo } from './centrifugo';
 import { sendNotificationToUser } from './webpush';
 import { db } from './db';
 
@@ -7,18 +7,10 @@ import { db } from './db';
  */
 export async function broadcastOrderUpdate(po: any, eventType: string, message: string) {
   try {
-    // 1. Emit SSE for connected clients via companyId
-    eventEmitter.emit('app_event', {
-      companyId: po.buyerCompanyId.toString(),
-      type: eventType,
-      orderId: po._id?.toString() || po.id,
-      message
-    });
-
-    eventEmitter.emit('app_event', {
-      companyId: po.supplierCompanyId.toString(),
-      type: eventType,
-      orderId: po._id?.toString() || po.id,
+    // 1. Emit to Centrifugo
+    await publishToCentrifugo('global_updates', {
+      type: 'db_change',
+      targetCompanyIds: [po.buyerCompanyId?.toString(), po.supplierCompanyId?.toString()],
       message
     });
 

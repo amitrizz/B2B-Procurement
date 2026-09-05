@@ -154,19 +154,33 @@ export default function AdminTab({
             adminPayments.map((p: any) => (
               <div key={p.id} className="glass-card rounded-2xl p-5 border border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4">
                 <div>
-                  <div className="flex gap-2 items-center">
+                  <div className="flex gap-2 items-center flex-wrap">
                     <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
                       p.status === 'HELD' ? 'bg-yellow-500/10 text-yellow-500' :
                       p.status === 'RELEASED' ? 'bg-green-500/10 text-green-400' : 'bg-slate-500/10 text-slate-400'
                     }`}>
                       {p.status}
                     </span>
-                    <span className="text-[10px] text-slate-500 font-semibold">Inv: {p.invoice?.number}</span>
+                    {p.invoice?.number && (
+                      <span className="text-[10px] text-slate-500 font-semibold">Inv: {p.invoice.number}</span>
+                    )}
+                    {p.invoice?.purchaseOrder?.poNumber && (
+                      <span className="text-[10px] text-slate-500 font-semibold">PO: {p.invoice.purchaseOrder.poNumber}</span>
+                    )}
                   </div>
-                  <h3 className="font-bold text-sm text-slate-200 mt-2">₹{(p.amount / 100).toLocaleString('en-IN')}</h3>
+                  <h3 className="font-bold text-sm text-slate-200 mt-2">
+                    Buyer paid: ₹{(p.amount / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </h3>
+                  {p.supplierPayoutAmount != null && (
+                    <p className="text-[10px] text-green-400 mt-1">
+                      Supplier item payout: ₹{(p.supplierPayoutAmount / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      {p.status === 'RELEASED' ? ' (sent)' : ' (pending)'}
+                    </p>
+                  )}
                   <p className="text-[10px] text-slate-400 mt-1">
-                    Buyer: <span className="font-semibold text-slate-300">{p.invoice?.purchaseOrder?.buyerCompany?.name}</span> &rarr; 
-                    Supplier: <span className="font-semibold text-slate-300">{p.invoice?.purchaseOrder?.supplierCompany?.name}</span>
+                    Buyer: <span className="font-semibold text-slate-300">{p.invoice?.purchaseOrder?.buyerCompany?.name || '—'}</span>
+                    {' → '}
+                    Supplier: <span className="font-semibold text-slate-300">{p.invoice?.purchaseOrder?.supplierCompany?.name || '—'}</span>
                   </p>
                 </div>
                 {p.status === 'HELD' && (
@@ -174,7 +188,7 @@ export default function AdminTab({
                     onClick={() => handleReleasePayment(p.id)}
                     className="py-1.5 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold whitespace-nowrap"
                   >
-                    Release Payout (3-Way Match)
+                    Release to Supplier
                   </button>
                 )}
               </div>

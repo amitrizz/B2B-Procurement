@@ -26,7 +26,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       { $match: { _id: new mongoose.Types.ObjectId(id) } },
       {
         $lookup: {
-          from: 'Company',
+          from: 'companies',
           localField: 'buyerCompanyId',
           foreignField: '_id',
           as: 'buyerCompany'
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       { $unwind: { path: '$buyerCompany', preserveNullAndEmptyArrays: true } },
       {
         $lookup: {
-          from: 'Company',
+          from: 'companies',
           localField: 'supplierCompanyId',
           foreignField: '_id',
           as: 'supplierCompany'
@@ -44,15 +44,15 @@ export async function GET(req: NextRequest, { params }: Params) {
       { $unwind: { path: '$supplierCompany', preserveNullAndEmptyArrays: true } },
       {
         $lookup: {
-          from: 'POItem',
+          from: 'purchaseorderitems',
           localField: '_id',
-          foreignField: 'poId',
+          foreignField: 'purchaseOrderId',
           as: 'items'
         }
       },
       {
         $lookup: {
-          from: 'RFQItem',
+          from: 'rfqitems',
           localField: 'items.rfqItemId',
           foreignField: '_id',
           as: 'rfqItems'
@@ -60,7 +60,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       },
       {
         $lookup: {
-          from: 'DeliveryOrder',
+          from: 'deliveryorders',
           localField: '_id',
           foreignField: 'purchaseOrderId',
           as: 'deliveryOrder'
@@ -69,7 +69,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       { $unwind: { path: '$deliveryOrder', preserveNullAndEmptyArrays: true } },
       {
         $lookup: {
-          from: 'Company',
+          from: 'companies',
           localField: 'deliveryOrder.transporterId',
           foreignField: '_id',
           as: 'transporter'
@@ -85,7 +85,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       { $project: { transporter: 0 } },
       {
         $lookup: {
-          from: 'Dispute',
+          from: 'disputes',
           localField: '_id',
           foreignField: 'purchaseOrderId',
           as: 'disputes'
@@ -93,10 +93,18 @@ export async function GET(req: NextRequest, { params }: Params) {
       },
       {
         $lookup: {
-          from: 'Review',
+          from: 'reviews',
           localField: '_id',
           foreignField: 'purchaseOrderId',
           as: 'reviews'
+        }
+      },
+      {
+        $lookup: {
+          from: 'invoices',
+          localField: '_id',
+          foreignField: 'purchaseOrderId',
+          as: 'invoices'
         }
       }
     ]);
@@ -127,7 +135,8 @@ export async function GET(req: NextRequest, { params }: Params) {
           transporter: o.deliveryOrder.transporter ? { ...o.deliveryOrder.transporter, id: o.deliveryOrder.transporter._id.toString() } : null
         } : null,
         disputes: o.disputes.map((d: any) => ({ ...d, id: d._id.toString() })),
-        reviews: o.reviews.map((r: any) => ({ ...r, id: r._id.toString() }))
+        reviews: o.reviews.map((r: any) => ({ ...r, id: r._id.toString() })),
+        invoices: (o.invoices || []).map((inv: any) => ({ ...inv, id: inv._id.toString() })),
       };
       
       delete order.rfqItems;

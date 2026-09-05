@@ -3,11 +3,15 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Shield, Building, User, Lock, Mail, ArrowRight, KeyRound } from 'lucide-react';
+import { getDefaultRouteForRole } from '@/lib/roleRouting';
+
+const REMEMBER_EMAIL_KEY = 'rememberedLoginEmail';
 
 export default function Home() {
   const [authMode, setAuthMode] = useState<'login' | 'register' | 'forgot' | 'reset'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [name, setName] = useState('');
   const [gstin, setGstin] = useState('');
   const [resetToken, setResetToken] = useState('');
@@ -19,14 +23,24 @@ export default function Home() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const router = useRouter();
 
-  // Route guarding: redirect to dashboard if token and user exist
+  // Route guarding: redirect to role-appropriate page if already logged in
   useEffect(() => {
     const token = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
     if (token && storedUser) {
-      router.push('/dashboard');
+      try {
+        const parsed = JSON.parse(storedUser);
+        router.push(getDefaultRouteForRole(parsed.role));
+      } catch {
+        router.push('/marketplace');
+      }
     } else {
       setCheckingAuth(false);
+      const savedEmail = localStorage.getItem(REMEMBER_EMAIL_KEY);
+      if (savedEmail) {
+        setEmail(savedEmail);
+        setRememberMe(true);
+      }
     }
   }, [router]);
 
@@ -91,12 +105,17 @@ export default function Home() {
         setError(data.message || 'Authentication failed');
       } else {
         if (authMode === 'login') {
+          if (rememberMe) {
+            localStorage.setItem(REMEMBER_EMAIL_KEY, email.trim());
+          } else {
+            localStorage.removeItem(REMEMBER_EMAIL_KEY);
+          }
           localStorage.setItem('user', JSON.stringify(data.data.user));
           localStorage.setItem('token', data.data.accessToken);
           if (data.data.refreshToken) {
             localStorage.setItem('refreshToken', data.data.refreshToken);
           }
-          router.push('/dashboard');
+          router.push(getDefaultRouteForRole(data.data.user?.role));
         } else {
           setAuthMode('login');
           setSuccessMsg('Registration successful! Please log in.');
@@ -301,6 +320,18 @@ export default function Home() {
                     className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition-all text-white"
                   />
                 </div>
+
+                {authMode === 'login' && (
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="w-3.5 h-3.5 rounded border-white/20 bg-slate-950 text-blue-500 focus:ring-blue-500/30"
+                    />
+                    <span className="text-xs text-slate-400">Remember me</span>
+                  </label>
+                )}
 
                 <button
                   type="submit"

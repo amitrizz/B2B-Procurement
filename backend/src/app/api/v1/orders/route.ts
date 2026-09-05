@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getAuthUser, authErrorResponse } from '@/lib/auth';
+import { sanitizeDeliveryOrder } from '@/lib/deliveryOrderSanitize';
 import mongoose from 'mongoose';
 
 export async function GET(req: NextRequest) {
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
       { $sort: { createdAt: -1 } },
       {
         $lookup: {
-          from: 'Company',
+          from: 'companies',
           localField: 'buyerCompanyId',
           foreignField: '_id',
           as: 'buyerCompany'
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
       },
       {
         $lookup: {
-          from: 'Company',
+          from: 'companies',
           localField: 'supplierCompanyId',
           foreignField: '_id',
           as: 'supplierCompany'
@@ -55,45 +56,101 @@ export async function GET(req: NextRequest) {
       },
       {
         $lookup: {
-          from: 'POItem',
+          from: 'purchaseorderitems',
           localField: '_id',
-          foreignField: 'poId',
+          foreignField: 'purchaseOrderId',
           as: 'items'
         }
       },
       {
         $lookup: {
-          from: 'RFQItem',
+          from: 'rfqitems',
           localField: 'items.rfqItemId',
           foreignField: '_id',
           as: 'rfqItems'
         }
+      },
+      {
+        $lookup: {
+          from: 'deliveryorders',
+          localField: '_id',
+          foreignField: 'purchaseOrderId',
+          as: 'deliveryOrder'
+        }
+      },
+      {
+        $addFields: {
+          'deliveryOrder': { $arrayElemAt: ['$deliveryOrder', 0] }
+        }
+      },
+      {
+        $lookup: {
+          from: 'invoices',
+          localField: '_id',
+          foreignField: 'purchaseOrderId',
+          as: 'invoices'
+        }
+      },
+      {
+        $lookup: {
+          from: 'reviews',
+          localField: '_id',
+          foreignField: 'purchaseOrderId',
+          as: 'reviews'
+        }
       }
     ]);
 
-    const orders = ordersDoc.map((o: any) => {
-      const items = o.items.map((i: any) => {
-        const rfqItem = o.rfqItems.find((r: any) => r._id.toString() === i.rfqItemId.toString());
-        return {
-          ...i,
-          id: i._id.toString(),
-          rfqItem: rfqItem ? { ...rfqItem, id: rfqItem._id.toString() } : null
-        };
-      });
+    const orders = (
+      await Promise.all(
+        ordersDoc.map(async (o: any) => {
+          const items = o.items.map((i: any) => {
+            const rfqItem = o.rfqItems.find(
+              (r: any) => r._id.toString() === i.rfqItemId?.toString()
+            );
+            return {
+              ...i,
+              id: i._id.toString(),
+              rfqItem: rfqItem ? { ...rfqItem, id: rfqItem._id.toString() } : null,
+            };
+          });
 
-      return {
-        ...o,
-        id: o._id.toString(),
-        buyerCompany: o.buyerCompany ? { name: o.buyerCompany.name } : null,
-        supplierCompany: o.supplierCompany ? { name: o.supplierCompany.name } : null,
-        items
-      };
-    }).map((o: any) => {
-       delete o.rfqItems;
-       return o;
+          const { computeOrderAmounts } = await import('@/lib/orderAmounts');
+          const pricing = await computeOrderAmounts(o, items);
+
+          const settlementInvoice = (o.invoices || []).find(
+            (inv: any) => inv.type === 'SUPPLIER_PAYOUT'
+          );
+          const taxInvoice = (o.invoices || []).find((inv: any) => inv.type === 'TAX_INVOICE');
+
+          return {
+            ...o,
+            id: o._id.toString(),
+            buyerCompany: o.buyerCompany ? { name: o.buyerCompany.name } : null,
+            supplierCompany: o.supplierCompany ? { name: o.supplierCompany.name } : null,
+            items,
+            buyerTotal: pricing.buyerTotal,
+            goodsTaxable: pricing.goodsTaxable,
+            platformFeeGst: pricing.taxTotal,
+            supplierPayoutAmount: pricing.supplierPayoutTotal,
+            supplierPayoutStatus: settlementInvoice?.status || null,
+            taxInvoiceStatus: taxInvoice?.status || null,
+            invoices: (o.invoices || []).map((inv: any) => ({ ...inv, id: inv._id.toString() })),
+            reviews: (o.reviews || []).map((r: any) => ({ ...r, id: r._id.toString() })),
+          };
+        })
+      )
+    ).map((o: any) => {
+      delete o.rfqItems;
+      if (o.deliveryOrder) {
+        o.deliveryOrder = sanitizeDeliveryOrder(o.deliveryOrder, {
+          role: user.role,
+          isBuyer: type === 'buying',
+          isSupplier: type === 'selling',
+        });
+      }
+      return o;
     });
-
-    // Log first order's workImage fields for debugging
     if (orders.length > 0) {
       const first = orders[0];
       console.log('[ORDERS-LIST] First order fields:', JSON.stringify({

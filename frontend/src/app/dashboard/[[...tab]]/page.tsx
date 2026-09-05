@@ -2,6 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { onCentrifugoEvent } from '@/lib/centrifugoClient';
+import { applyCompanyToUser, getCompanyIdFromUser, persistUser, patchUserCompany } from '@/lib/userSession';
+import { resolveToastType } from '@/lib/realtimeNotifications';
+import { getDefaultRouteForRole, getRouteForTab, isTabAllowedForRole } from '@/lib/roleRouting';
 import { 
   Building, LogOut, CheckCircle, Clock, ShoppingCart, 
   Plus, Users, FileText, ChevronRight, Truck, Info,
@@ -42,12 +46,14 @@ export default function Dashboard() {
   else if (tabName === 'delivery') activeTab = 'transporter';
   else if (tabName) activeTab = tabName;
 
+  const companyId = getCompanyIdFromUser(user);
+
   const handleTabChange = (tab: string) => {
-    let route = '/marketplace';
-    if (tab === 'my_rfqs') route = '/rfqs';
-    else if (tab === 'transporter') route = '/delivery';
-    else if (tab !== 'marketplace') route = `/${tab}`;
-    router.push(route);
+    if (user && !isTabAllowedForRole(tab, user.role)) {
+      router.push(getDefaultRouteForRole(user.role));
+      return;
+    }
+    router.push(getRouteForTab(tab));
     setShowMobileSidebar(false);
   };
 
@@ -108,6 +114,65 @@ export default function Dashboard() {
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 4000);
+  };
+
+  const fetchDataRef = useRef<(isBackground?: boolean) => Promise<void>>(null as any);
+  const companyFetchSeqRef = useRef(0);
+  /** After a live Centrifugo patch, ignore stale API responses briefly. */
+  const companyRealtimePatchAtRef = useRef(0);
+
+  /** Fetch latest company profile; ignores stale out-of-order responses. */
+  const refreshCompanyProfile = async (): Promise<void> => {
+    const token = localStorage.getItem('token');
+    const stored = localStorage.getItem('user');
+    if (!token || !stored) return;
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(stored);
+    } catch {
+      return;
+    }
+
+    const companyId = getCompanyIdFromUser(parsed);
+    if (!companyId) return;
+
+    const seq = ++companyFetchSeqRef.current;
+
+    try {
+      const res = await fetch(`/api/v1/company/me?_t=${Date.now()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+      });
+      const raw = await res.text();
+      let d: any;
+      try {
+        d = raw ? JSON.parse(raw) : null;
+      } catch {
+        console.error('Non-JSON response from /company/me:', raw.slice(0, 120));
+        return;
+      }
+      if (seq !== companyFetchSeqRef.current) return;
+      if (d.success && d.data) {
+        setUser((prev: any) => {
+          if (!prev) return prev;
+          const recentlyPatched = Date.now() - companyRealtimePatchAtRef.current < 15000;
+          if (
+            recentlyPatched &&
+            prev.company?.status &&
+            prev.company.status !== 'PENDING' &&
+            d.data.status === 'PENDING'
+          ) {
+            return prev;
+          }
+          const updated = applyCompanyToUser(prev, d.data);
+          persistUser(updated);
+          return updated;
+        });
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   useEffect(() => {
@@ -172,22 +237,46 @@ export default function Dashboard() {
       const parsed = JSON.parse(storedUser);
       setUser(parsed);
       setCheckingAuth(false);
-      // Fetch live company status
-      const headers = { 'Authorization': `Bearer ${token}` };
-      fetch('/api/v1/company/me', { headers })
-        .then(res => res.json())
-        .then(d => {
-          if (d.success && d.data) {
-            const updatedUser = { ...parsed, company: d.data };
-            setUser(updatedUser);
-            localStorage.setItem('user', JSON.stringify(updatedUser));
-          }
+      const companyId = getCompanyIdFromUser(parsed);
+      if (companyId) {
+        const seq = ++companyFetchSeqRef.current;
+        fetch(`/api/v1/company/me?_t=${Date.now()}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
         })
-        .catch(err => console.error(err));
+          .then(async (res) => {
+            const raw = await res.text();
+            try {
+              return raw ? JSON.parse(raw) : null;
+            } catch {
+              console.error('Non-JSON response from /company/me:', raw.slice(0, 120));
+              return null;
+            }
+          })
+          .then(d => {
+            if (seq !== companyFetchSeqRef.current) return;
+            if (d?.success && d.data) {
+              setUser((prev: any) => {
+                const base = prev || parsed;
+                const updated = applyCompanyToUser(base, d.data);
+                persistUser(updated);
+                return updated;
+              });
+            }
+          })
+          .catch(err => console.error(err));
+      }
     }
   }, [router]);
 
-  const fetchDataRef = useRef<(isBackground?: boolean) => Promise<void>>(null as any);
+  // Redirect users away from tabs their role cannot access
+  useEffect(() => {
+    if (!user || checkingAuth) return;
+    if (!isTabAllowedForRole(activeTab, user.role)) {
+      router.replace(getDefaultRouteForRole(user.role));
+    }
+  }, [user, activeTab, checkingAuth, router]);
+
   useEffect(() => {
     fetchDataRef.current = fetchData;
   });
@@ -196,36 +285,41 @@ export default function Dashboard() {
     if (user) {
       fetchData();
     }
-  }, [user?.company?.status, activeTab, mode]);
+  }, [activeTab, mode, user?.id]);
 
-  // Real-time SSE connection & Push Notifications setup
+  // Real-time updates — apply payload immediately, then refresh from API
   useEffect(() => {
-    if (!user || !user.companyId) return;
     const token = localStorage.getItem('token');
-    if (!token) return;
+    if (!user || !companyId || !token) return;
 
-    // 1. Setup Server-Sent Events (SSE)
-    const sseUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL || ''}/api/v1/events?token=${token}`;
-    const eventSource = new EventSource(sseUrl);
+    const unsub = onCentrifugoEvent((data) => {
+      const isCompanyStatus =
+        data?.type === 'company_status_changed' ||
+        data?.eventType?.startsWith('company_');
 
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        // If we receive ANY event, we refresh data to keep the UI perfectly in sync
-        if (data.type) {
-          if (fetchDataRef.current) fetchDataRef.current(true);
-        }
-      } catch (e) {
-        console.error('SSE parsing error', e);
+      if (isCompanyStatus && data?.status) {
+        companyRealtimePatchAtRef.current = Date.now();
+        setUser((prev: any) => {
+          if (!prev) return prev;
+          const updated = patchUserCompany(prev, {
+            status: data.status,
+            ...(data.kycRejectReason !== undefined ? { kycRejectReason: data.kycRejectReason } : {}),
+            ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
+          });
+          persistUser(updated);
+          return updated;
+        });
       }
-    };
 
-      // Handle client disconnects to prevent memory leaks
-      eventSource.onerror = (error) => {
-        console.error('SSE error:', error);
-        eventSource.close();
-      };
-    // 2. Setup Web Push Notifications
+      if (data?.message) {
+        showToast(data.message, resolveToastType(data));
+      }
+
+      refreshCompanyProfile();
+      if (fetchDataRef.current) fetchDataRef.current(true);
+    });
+
+    // Setup Web Push Notifications
     if ('serviceWorker' in navigator && 'PushManager' in window) {
       navigator.serviceWorker.register('/sw.js').then((registration) => {
         Notification.requestPermission().then((permission) => {
@@ -250,47 +344,33 @@ export default function Dashboard() {
     }
 
     return () => {
-      if (eventSource) eventSource.close();
+      unsub();
     };
-  }, [user?.companyId]);
+  }, [companyId]);
 
   const fetchData = async (isBackground = false) => {
     if (!isBackground) setLoading(true);
     try {
       const headers = { 'Authorization': `Bearer ${localStorage.getItem('token')}` };
       const fetchOpts: RequestInit = { headers, cache: 'no-store' };
-      
-      // Pull live company details to keep UI state in sync
-      if (user?.companyId) {
-        try {
-          const resCompany = await fetch(`/api/v1/company/me?_t=${Date.now()}`, fetchOpts);
-          const dCompany = await resCompany.json();
-          if (dCompany.success && dCompany.data) {
-            setUser((prev: any) => {
-              if (!prev) return prev;
-              const updated = { ...prev, company: dCompany.data };
-              localStorage.setItem('user', JSON.stringify(updated));
-              return updated;
-            });
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      }
 
-      if (activeTab === 'marketplace') {
+      await refreshCompanyProfile();
+
+      const role = user?.role;
+
+      if (activeTab === 'marketplace' && role !== 'TRANSPORTER' && role !== 'FINANCE') {
         const res = await fetch(`/api/v1/marketplace/requirements?_t=${Date.now()}`, fetchOpts);
         const d = await res.json();
         if (d.success) setMarketplaceRfqs(d.data);
       }
       
-      if (activeTab === 'my_rfqs') {
+      if (activeTab === 'my_rfqs' && role !== 'TRANSPORTER' && role !== 'FINANCE') {
         const res = await fetch(`/api/v1/rfqs?_t=${Date.now()}`, fetchOpts);
         const d = await res.json();
         if (d.success) setRfqs(d.data);
       }
 
-      if (activeTab === 'orders') {
+      if (activeTab === 'orders' && role !== 'TRANSPORTER') {
         const resBuying = await fetch(`/api/v1/orders?type=buying&_t=${Date.now()}`, fetchOpts);
         const resSelling = await fetch(`/api/v1/orders?type=selling&_t=${Date.now()}`, fetchOpts);
         const dBuying = await resBuying.json();
@@ -310,7 +390,12 @@ export default function Dashboard() {
 
         const resPay = await fetch(`/api/v1/admin/payments?_t=${Date.now()}`, fetchOpts);
         const dPay = await resPay.json();
-        if (dPay.success) setAdminPayments(dPay.data);
+        if (dPay.success) {
+          setAdminPayments(dPay.data || []);
+        } else {
+          console.error('Admin payments fetch failed:', dPay.message);
+          setAdminPayments([]);
+        }
       }
 
       if (activeTab === 'admin_users' && user?.role === 'PLATFORM_ADMIN') {
@@ -325,13 +410,21 @@ export default function Dashboard() {
         if (d.success) setDeliveries(d.data);
       }
 
-      if (activeTab === 'prs' || activeTab === 'marketplace' || activeTab === 'my_rfqs') {
+      if (
+        (activeTab === 'prs' || activeTab === 'marketplace' || activeTab === 'my_rfqs') &&
+        role !== 'TRANSPORTER' &&
+        role !== 'FINANCE'
+      ) {
         const res = await fetch('/api/v1/prs', { headers });
         const d = await res.json();
         if (d.success) setPrs(d.data);
       }
 
-      if (activeTab === 'prs' || activeTab === 'catalog' || activeTab === 'marketplace' || activeTab === 'my_rfqs') {
+      if (
+        (activeTab === 'prs' || activeTab === 'catalog' || activeTab === 'marketplace' || activeTab === 'my_rfqs') &&
+        role !== 'TRANSPORTER' &&
+        role !== 'FINANCE'
+      ) {
         const res = await fetch('/api/v1/company/components', { headers });
         const d = await res.json();
         if (d.success) setCompanyComponents(d.data);
@@ -686,7 +779,13 @@ export default function Dashboard() {
       });
       const d = await res.json();
       if (d.success) {
-        showToast('Order status: READY FOR PICKUP. Delivery generated.', 'success');
+        const pickupOtp = d.data?.pickupOtp;
+        showToast(
+          pickupOtp
+            ? `Ready for pickup! Share Pickup OTP ${pickupOtp} with the transporter.`
+            : 'Order status: READY FOR PICKUP. Delivery generated.',
+          'success'
+        );
         fetchData();
       } else {
         showToast(d.message || 'Action failed', 'error');
@@ -698,15 +797,31 @@ export default function Dashboard() {
 
   const handleConfirmDelivery = async (orderId: string) => {
     try {
-      const headers = { 'Authorization': `Bearer ${localStorage.getItem('token')}` };
-      const res = await fetch(`/api/v1/orders/${orderId}/confirm-delivery`, { method: 'POST', headers });
-      const d = await res.json();
-      if (d.success) {
-        showToast('Delivery confirmed. Order completed.', 'success');
+      const headers = {
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json',
+      };
+      const res = await fetch(`/api/v1/orders/${orderId}/confirm-delivery`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({}),
+      });
+      const raw = await res.text();
+      let d: any;
+      try {
+        d = raw ? JSON.parse(raw) : null;
+      } catch {
+        showToast('Server error while confirming GRN', 'error');
+        return;
+      }
+      if (d?.success) {
+        showToast(d.message || 'Delivery confirmed. Order completed.', 'success');
         fetchData();
+      } else {
+        showToast(d?.message || 'Failed to confirm delivery (GRN)', 'error');
       }
     } catch (err) {
-      showToast('Action failed', 'error');
+      showToast('Failed to confirm delivery (GRN)', 'error');
     }
   };
 
@@ -724,11 +839,45 @@ export default function Dashboard() {
       });
       const d = await res.json();
       if (d.success) {
-        showToast(`Status updated to ${nextStatus}`, 'error');
+        showToast(`Status updated to ${nextStatus}`, 'success');
         fetchData();
+        return true;
       }
+      showToast(d.message || 'Failed to update delivery', 'error');
+      return false;
     } catch (err) {
       showToast('Failed to update delivery', 'error');
+      return false;
+    }
+  };
+
+  const handleVerifyDeliveryOtp = async (
+    deliveryId: string,
+    otp: string,
+    type: 'PICKUP' | 'DELIVERY',
+    podFileId?: string
+  ): Promise<boolean> => {
+    try {
+      const headers = {
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json',
+      };
+      const res = await fetch(`/api/v1/transporter/deliveries/${deliveryId}/verify-otp`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ otp, type, podFileId }),
+      });
+      const d = await res.json();
+      if (d.success) {
+        showToast(d.message || (type === 'PICKUP' ? 'Pickup verified!' : 'Delivery verified!'), 'success');
+        fetchData();
+        return true;
+      }
+      showToast(d.message || 'OTP verification failed', 'error');
+      return false;
+    } catch {
+      showToast('OTP verification failed', 'error');
+      return false;
     }
   };
 
@@ -1014,6 +1163,7 @@ export default function Dashboard() {
             handleReadyForPickup={handleReadyForPickup}
             handleConfirmDelivery={handleConfirmDelivery}
             mode={mode}
+            showToast={showToast}
           />
         )}
 
@@ -1022,6 +1172,8 @@ export default function Dashboard() {
             deliveries={deliveries}
             fetchData={fetchData}
             handleUpdateDeliveryStatus={handleUpdateDeliveryStatus}
+            handleVerifyDeliveryOtp={handleVerifyDeliveryOtp}
+            showToast={showToast}
           />
         )}
 

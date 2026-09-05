@@ -3,12 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "dev": "node scripts/run-env.mjs dev next dev",
+    "dev:prod": "node scripts/run-env.mjs prod next dev",
+    "build": "node scripts/run-env.mjs prod next build",
+    "build:dev": "node scripts/run-env.mjs dev next build",
+    "build:prod": "node scripts/run-env.mjs prod next build",
+    "start": "node scripts/run-env.mjs prod next start",
+    "start:dev": "node scripts/run-env.mjs dev next start",
+    "start:prod": "node scripts/run-env.mjs prod next start",
+    "lint": "eslint",
+    "env:init": "node scripts/init-env.mjs",
+    "env:check": "node scripts/run-env.mjs dev node -e \"console.log('Frontend dev env OK if .env.dev exists')\""
   },
   "dependencies": {
+    "centrifuge": "^5.7.2",
     "lucide-react": "^1.33.0",
     "next": "16.3.2",
     "react": "19.2.8",

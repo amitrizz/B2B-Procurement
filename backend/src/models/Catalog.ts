@@ -55,6 +55,8 @@ const CompanyComponentSchema = new Schema({
   defaultUnit: { type: String, default: 'pcs' }
 }, { timestamps: true });
 
+CompanyComponentSchema.index({ companyId: 1, componentName: 1 }, { unique: true });
+
 export const CompanyComponent = mongoose.models.CompanyComponent || mongoose.model('CompanyComponent', CompanyComponentSchema);
 
 // CompanyCategory

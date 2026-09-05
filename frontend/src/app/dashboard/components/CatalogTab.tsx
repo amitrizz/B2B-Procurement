@@ -213,7 +213,7 @@ export default function CatalogTab({
                   <span>Estimated Total:</span>
                   <span>₹{((orderQty * Number(showOrderModal.unitPrice) * 1.23) / 100).toLocaleString('en-IN')}</span>
                 </div>
-                <div className="text-[10px] text-slate-500 text-right mt-1">Includes 18% GST & 5% Platform Fee</div>
+                <div className="text-[10px] text-slate-500 text-right mt-1">Includes 5% platform fee + GST on fee</div>
               </div>
 
               <div className="flex gap-3 pt-4 border-t border-white/10 mt-6">

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { publishToCentrifugo } from './centrifugo';
 
 const MONGODB_URI = process.env.DATABASE_URL;
 
@@ -29,6 +30,22 @@ async function connectToDatabase() {
 
     cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose) => {
       console.log('✅ MongoDB is connected successfully');
+      
+      // Register global plugin to publish to Centrifugo on any mutation
+      mongoose.plugin((schema) => {
+        const publishUpdate = function() {
+          console.log('[Mongoose Plugin] Detected DB Mutation. Publishing to Centrifugo...');
+          // Fire and forget global refresh trigger — use target:'all' so frontend filter accepts it
+          publishToCentrifugo('global_updates', { type: 'db_change', target: 'all' }).catch(console.error);
+        };
+        
+        schema.post('save', publishUpdate);
+        schema.post('findOneAndUpdate', publishUpdate);
+        schema.post('updateOne', publishUpdate);
+        schema.post('deleteOne', publishUpdate);
+        schema.post('deleteMany', publishUpdate);
+      });
+
       return mongoose;
     }).catch(err => {
       console.error('❌ Failed to connect to MongoDB:', err.message);

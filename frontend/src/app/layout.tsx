@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import CentrifugoProvider from "@/components/CentrifugoProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -31,7 +32,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full dark bg-slate-950 text-slate-100">
       <body className={`${inter.className} min-h-full flex flex-col`}>
-        {children}
+        <CentrifugoProvider>
+          {children}
+        </CentrifugoProvider>
         <script
           dangerouslySetInnerHTML={{
             __html: `
