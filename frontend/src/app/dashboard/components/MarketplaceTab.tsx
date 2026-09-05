@@ -1,5 +1,6 @@
-import { RefreshCw, ArrowLeft, ChevronRight, Search, X } from 'lucide-react';
+import { RefreshCw, ArrowLeft, ChevronRight, Search, X, Loader2 } from 'lucide-react';
 import { useState } from 'react';
+import { RefreshButton } from '@/components/ui/RefreshButton';
 
 interface MarketplaceTabProps {
   marketplaceRfqs: any[];
@@ -116,9 +117,7 @@ export default function MarketplaceTab({
             {mode === 'buyer' ? 'Track bids received and award winner contracts' : 'Quote on open procurement requirements from other companies'}
           </p>
         </div>
-        <button onClick={fetchData} className="p-2 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all">
-          <RefreshCw className="w-4 h-4 text-slate-300" />
-        </button>
+        <RefreshButton onRefresh={fetchData} size="sm" />
       </div>
 
       {selectedRfqForBidding ? (

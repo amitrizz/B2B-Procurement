@@ -25,7 +25,7 @@ export function isTabAllowedForRole(tab: string, role?: string | null): boolean 
   }
 
   if (role === 'FINANCE') {
-    return ['orders', 'profile', 'catalog'].includes(tab);
+    return ['orders', 'profile', 'catalog', 'company_chat'].includes(tab);
   }
 
   return true;
@@ -35,7 +35,8 @@ export function getRouteForTab(tab: string): string {
   if (tab === 'my_rfqs') return '/rfqs';
   if (tab === 'transporter') return '/delivery';
   if (tab === 'marketplace') return '/marketplace';
-  if (tab === 'admin_users') return '/admin_users';
+  if (tab === 'admin_users') return '/admin';
+  if (tab === 'company_chat') return '/chat';
   if (tab !== 'marketplace') return `/${tab}`;
   return '/marketplace';
 }

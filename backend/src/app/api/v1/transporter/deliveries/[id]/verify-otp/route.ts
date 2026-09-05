@@ -3,12 +3,14 @@ import { db } from '@/lib/db';
 import { getAuthUser, authErrorResponse } from '@/lib/auth';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
+import { SamplingCampaign, SamplingInvite } from '@/models/Sampling';
+import { broadcastSampleDelivered, broadcastSamplePickedUp } from '@/lib/samplingEvents';
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-    console.log(`[API] ${req.method} ${req.nextUrl?.pathname || req.url}`);
+  console.log(`[API] ${req.method} ${req.nextUrl?.pathname || req.url}`);
   try {
     const user = await getAuthUser(req);
     if (!user) return authErrorResponse();
@@ -37,8 +39,9 @@ export async function POST(
     await db();
     const { DeliveryOrder } = await import('@/models/Logistics');
     const { PurchaseOrder } = await import('@/models/PurchaseOrder');
+    const { RFQ } = await import('@/models/RFQ');
 
-    const delivery = await DeliveryOrder.findById(id).lean() as any;
+    const delivery = (await DeliveryOrder.findById(id).lean()) as any;
 
     if (!delivery) {
       return NextResponse.json({ success: false, code: 'NOT_FOUND', message: 'Delivery not found' }, { status: 404 });
@@ -96,6 +99,7 @@ export async function POST(
       }
     }
 
+    const isSample = delivery.purpose === 'SAMPLE';
     const session = await mongoose.startSession();
 
     try {
@@ -109,11 +113,48 @@ export async function POST(
 
       await DeliveryOrder.updateOne({ _id: id }, { $set: deliveryUpdate }, { session });
 
-      await PurchaseOrder.updateOne(
-        { _id: delivery.purchaseOrderId },
-        { $set: { status: nextStatus } },
-        { session }
-      );
+      if (!isSample && delivery.purchaseOrderId) {
+        await PurchaseOrder.updateOne(
+          { _id: delivery.purchaseOrderId },
+          { $set: { status: nextStatus } },
+          { session }
+        );
+      }
+
+      if (isSample && type === 'PICKUP' && delivery.samplingInviteId) {
+        await SamplingInvite.updateOne(
+          { _id: delivery.samplingInviteId },
+          { $set: { status: 'PICKED_UP' } },
+          { session }
+        );
+      }
+
+      if (isSample && type === 'DELIVERY' && delivery.samplingInviteId) {
+        await SamplingInvite.updateOne(
+          { _id: delivery.samplingInviteId },
+          { $set: { status: 'DELIVERED' } },
+          { session }
+        );
+
+        const invite = (await SamplingInvite.findById(delivery.samplingInviteId).session(session).lean()) as any;
+        if (invite?.campaignId) {
+          const activeInvites = (await SamplingInvite.find({
+            campaignId: invite.campaignId,
+            status: { $nin: ['WITHDRAWN', 'NOT_SELECTED', 'SELECTED'] },
+          })
+            .session(session)
+            .lean()) as any[];
+
+          const allDelivered =
+            activeInvites.length > 0 && activeInvites.every((i) => i.status === 'DELIVERED');
+
+          await SamplingCampaign.updateOne(
+            { _id: invite.campaignId },
+            { $set: { status: allDelivered ? 'EVALUATION' : 'DELIVERED' } },
+            { session }
+          );
+        }
+      }
 
       await session.commitTransaction();
     } catch (err) {
@@ -123,16 +164,46 @@ export async function POST(
       session.endSession();
     }
 
-    const purchaseOrder = await PurchaseOrder.findById(delivery.purchaseOrderId).lean() as any;
-    if (purchaseOrder) {
-      const { broadcastOrderUpdate } = await import('@/lib/orderEvents');
-      await broadcastOrderUpdate(
-        purchaseOrder,
-        'delivery_updated',
-        type === 'PICKUP'
-          ? `Order ${purchaseOrder.poNumber || purchaseOrder._id} picked up after OTP verification.`
-          : `Order ${purchaseOrder.poNumber || purchaseOrder._id} delivered after OTP verification.`
-      );
+    if (isSample && type === 'PICKUP' && delivery.rfqId) {
+      const rfq = (await RFQ.findById(delivery.rfqId).lean()) as any;
+      const invite = delivery.samplingInviteId
+        ? ((await SamplingInvite.findById(delivery.samplingInviteId).lean()) as any)
+        : null;
+      if (rfq && invite) {
+        const { Company } = await import('@/models/Company');
+        const supplier = (await Company.findById(invite.supplierCompanyId).lean()) as any;
+        await broadcastSamplePickedUp(
+          rfq.buyerCompanyId.toString(),
+          invite.supplierCompanyId.toString(),
+          supplier?.name || 'Supplier',
+          rfq.rfqNumber,
+          delivery.deliveryNumber
+        );
+      }
+    } else if (isSample && type === 'DELIVERY' && delivery.rfqId) {
+      const rfq = (await RFQ.findById(delivery.rfqId).lean()) as any;
+      const invite = delivery.samplingInviteId
+        ? ((await SamplingInvite.findById(delivery.samplingInviteId).lean()) as any)
+        : null;
+      if (rfq && invite) {
+        await broadcastSampleDelivered(
+          rfq.buyerCompanyId.toString(),
+          invite.supplierCompanyId.toString(),
+          rfq.rfqNumber
+        );
+      }
+    } else if (delivery.purchaseOrderId) {
+      const purchaseOrder = (await PurchaseOrder.findById(delivery.purchaseOrderId).lean()) as any;
+      if (purchaseOrder) {
+        const { broadcastOrderUpdate } = await import('@/lib/orderEvents');
+        await broadcastOrderUpdate(
+          purchaseOrder,
+          'delivery_updated',
+          type === 'PICKUP'
+            ? `Order ${purchaseOrder.poNumber || purchaseOrder._id} picked up after OTP verification.`
+            : `Order ${purchaseOrder.poNumber || purchaseOrder._id} delivered after OTP verification.`
+        );
+      }
     }
 
     return NextResponse.json({

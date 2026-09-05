@@ -11,6 +11,7 @@ export async function broadcastCompanyUpdate(companyId: string, eventType: strin
     // 1. Emit to Centrifugo
     await publishToCentrifugo('global_updates', {
       type: 'db_change',
+      eventType,
       targetCompanyIds: [companyId.toString()],
       message
     });

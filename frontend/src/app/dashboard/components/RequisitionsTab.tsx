@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { RefreshCw, FileText, CheckCircle, XCircle, Plus, Loader2 } from 'lucide-react';
+import { FileText, CheckCircle, XCircle, Plus, Loader2 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { RefreshButton } from '@/components/ui/RefreshButton';
 
 interface RequisitionsTabProps {
   prs: any[];
@@ -99,9 +100,7 @@ export default function RequisitionsTab({
           <p className="text-xs text-slate-400">Internal approvals required before publishing an RFQ</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={fetchData} className="p-2.5 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all flex items-center justify-center">
-            <RefreshCw className="w-4 h-4 text-slate-300" />
-          </button>
+          <RefreshButton onRefresh={fetchData} />
           <Button variant="primary" onClick={() => setShowCreateModal(true)}>
             <Plus className="w-4 h-4 mr-2" /> Create PR
           </Button>
@@ -139,16 +138,18 @@ export default function RequisitionsTab({
                     <button
                       onClick={() => handleApprovePR(pr.id, true)}
                       disabled={actionLoading === pr.id}
-                      className="py-1.5 px-3 bg-green-600 hover:bg-green-700 disabled:bg-green-800 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1"
+                      className="py-1.5 px-3 bg-green-600 hover:bg-green-700 disabled:bg-green-800 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5"
                     >
-                      <CheckCircle className="w-3.5 h-3.5" /> Approve
+                      {actionLoading === pr.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                      {actionLoading === pr.id ? 'Approving...' : 'Approve'}
                     </button>
                     <button
                       onClick={() => handleApprovePR(pr.id, false)}
                       disabled={actionLoading === pr.id}
-                      className="py-1.5 px-3 bg-red-600 hover:bg-red-700 disabled:bg-red-800 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1"
+                      className="py-1.5 px-3 bg-red-600 hover:bg-red-700 disabled:bg-red-800 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5"
                     >
-                      <XCircle className="w-3.5 h-3.5" /> Reject
+                      {actionLoading === pr.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+                      {actionLoading === pr.id ? 'Rejecting...' : 'Reject'}
                     </button>
                   </>
                 )}
@@ -236,8 +237,8 @@ export default function RequisitionsTab({
 
               <div className="flex gap-3 pt-4 border-t border-white/10 mt-6">
                 <Button type="button" variant="secondary" className="flex-1" onClick={() => setShowCreateModal(false)}>Cancel</Button>
-                <Button type="submit" variant="primary" className="flex-1" disabled={loading}>
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Submit for Approval'}
+                <Button type="submit" variant="primary" className="flex-1" loading={loading} disabled={loading}>
+                  Submit for Approval
                 </Button>
               </div>
             </form>

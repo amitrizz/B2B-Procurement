@@ -16,6 +16,16 @@ body {
   background-attachment: fixed;
 }
 
+/* Native select fallback (where custom DarkSelect is not used) */
+select {
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #030712;
+  color: #f3f4f6;
+}
+
 /* Glassmorphism utilities */
 .glass-panel {
   background: var(--card-bg);
@@ -66,20 +76,66 @@ body {
     border-radius: 9999px;
   }
 
-  /* Ensure inputs have optimal touch heights */
-  input, button {
-    min-height: 44px; /* Apple Tap Target Guideline */
+  /* Ensure inputs have optimal touch heights (not compact nav/icon buttons) */
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea,
+  button.btn-touch,
+  [type="submit"],
+  [type="button"].btn-touch {
+    min-height: 44px;
+  }
+
+  /* Bottom nav / compact controls */
+  .mobile-nav-btn {
+    min-height: 0 !important;
   }
 }
 
-/* Universal Button Tap/Click Tactile Feedback */
-button {
-  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), filter 0.15s ease, background-color 0.2s ease, border-color 0.2s ease !important;
+.pb-safe {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
 }
 
-button:active {
+.pt-safe {
+  padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+}
+
+/* Pointer cursor for all interactive controls */
+button:not(:disabled),
+[type="button"]:not(:disabled),
+[type="submit"]:not(:disabled),
+[type="reset"]:not(:disabled),
+a[href]:not([aria-disabled="true"]),
+label[for],
+select:not(:disabled),
+summary,
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+button:disabled,
+[type="button"]:disabled,
+[type="submit"]:disabled,
+[type="reset"]:disabled,
+[disabled],
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+/* Universal button tap/click tactile feedback */
+button:not(:disabled) {
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), filter 0.15s ease, background-color 0.2s ease, border-color 0.2s ease, opacity 0.15s ease !important;
+  user-select: none;
+}
+
+button:not(:disabled):active {
   transform: scale(0.96) !important;
-  filter: brightness(0.85) !important;
+  filter: brightness(0.88) !important;
+}
+
+button:disabled:active {
+  transform: none !important;
+  filter: none !important;
 }
 
 /* Custom 360 degree spin animation */

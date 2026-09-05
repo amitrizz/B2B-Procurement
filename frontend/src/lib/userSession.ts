@@ -31,3 +31,25 @@ export function patchUserCompany(user: any, patch: Record<string, unknown>): any
   if (!user?.company) return user;
   return applyCompanyToUser(user, { ...user.company, ...patch });
 }
+
+const DASHBOARD_MODE_KEY = 'p2p_dashboard_mode';
+
+export type DashboardMode = 'buyer' | 'seller';
+
+export function readDashboardMode(companyId?: string | null): DashboardMode {
+  if (typeof window === 'undefined') return 'buyer';
+  if (companyId) {
+    const scoped = localStorage.getItem(`${DASHBOARD_MODE_KEY}_${companyId}`);
+    if (scoped === 'buyer' || scoped === 'seller') return scoped;
+  }
+  const saved = localStorage.getItem(DASHBOARD_MODE_KEY);
+  return saved === 'seller' ? 'seller' : 'buyer';
+}
+
+export function persistDashboardMode(mode: DashboardMode, companyId?: string | null): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(DASHBOARD_MODE_KEY, mode);
+  if (companyId) {
+    localStorage.setItem(`${DASHBOARD_MODE_KEY}_${companyId}`, mode);
+  }
+}

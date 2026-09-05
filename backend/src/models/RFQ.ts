@@ -42,6 +42,9 @@ const RFQSchema = new Schema({
   deliveryAddressId: { type: Schema.Types.ObjectId, ref: 'CompanyAddress' },
   expectedBudget: { type: Number },
   buyerPrId: { type: Schema.Types.ObjectId, ref: 'PurchaseRequisition' },
+  sourcePurchaseOrderId: { type: Schema.Types.ObjectId, ref: 'PurchaseOrder' },
+  sourceChatThreadId: { type: Schema.Types.ObjectId, ref: 'CompanyChatThread' },
+  invitedSupplierCompanyId: { type: Schema.Types.ObjectId, ref: 'Company' },
   version: { type: Number, default: 0 }
 }, { timestamps: true });
 

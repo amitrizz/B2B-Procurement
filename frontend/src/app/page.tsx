@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, Building, User, Lock, Mail, ArrowRight, KeyRound } from 'lucide-react';
+import { Shield, Building, User, Lock, Mail, ArrowRight, KeyRound, Loader2 } from 'lucide-react';
 import { getDefaultRouteForRole } from '@/lib/roleRouting';
 
 const REMEMBER_EMAIL_KEY = 'rememberedLoginEmail';
@@ -336,10 +336,11 @@ export default function Home() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-blue-500/20 active:scale-[0.98]"
+                  className="w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-blue-500/20 active:scale-[0.98] disabled:opacity-70"
                 >
+                  {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                   {loading ? 'Authenticating...' : authMode === 'login' ? 'Access Marketplace' : 'Register and Setup Portal'}
-                  <ArrowRight className="w-4 h-4" />
+                  {!loading && <ArrowRight className="w-4 h-4" />}
                 </button>
               </form>
             </>
@@ -400,10 +401,11 @@ export default function Home() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex-1 py-2.5 px-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+                    className="flex-1 py-2.5 px-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] disabled:opacity-70"
                   >
+                    {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     {loading ? 'Sending...' : 'Send Link'}
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    {!loading && <ArrowRight className="w-3.5 h-3.5" />}
                   </button>
                 </div>
               </form>
@@ -464,10 +466,11 @@ export default function Home() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex-1 py-2.5 px-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+                    className="flex-1 py-2.5 px-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] disabled:opacity-70"
                   >
+                    {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     {loading ? 'Resetting...' : 'Reset Password'}
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    {!loading && <ArrowRight className="w-3.5 h-3.5" />}
                   </button>
                 </div>
               </form>

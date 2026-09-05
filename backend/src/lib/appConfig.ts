@@ -55,13 +55,13 @@ export function getAppConfig(): AppConfig {
       'FRONTEND_URL',
       process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_FRONTEND_URL,
       isProduction,
-      'http://127.0.0.1:3000'
+      'http://localhost:3000'
     ),
     backendUrl: requireUrl(
       'BACKEND_URL',
       process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL,
       isProduction,
-      'http://127.0.0.1:3001'
+      'http://localhost:3001'
     ),
     jwtSecret,
     bankHashPepper: process.env.BANK_HASH_PEPPER || jwtSecret || 'default-pepper',

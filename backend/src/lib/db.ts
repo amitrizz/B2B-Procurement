@@ -28,8 +28,23 @@ async function connectToDatabase() {
       bufferCommands: false,
     };
 
-    cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose) => {
+    cached.promise = mongoose.connect(MONGODB_URI!, opts).then(async (mongoose) => {
       console.log('✅ MongoDB is connected successfully');
+
+      const { syncDeliveryOrderIndexes } = await import('./syncDeliveryOrderIndexes');
+      syncDeliveryOrderIndexes().catch((err) => {
+        console.warn('[DeliveryOrder] Index sync failed:', err.message);
+      });
+
+      const { syncChatThreadIndexes } = await import('./syncChatThreadIndexes');
+      syncChatThreadIndexes().catch((err) => {
+        console.warn('[CompanyChatThread] Index sync failed:', err.message);
+      });
+
+      const { seedChatQaIfEmpty } = await import('./seedChatQa');
+      seedChatQaIfEmpty().catch((err) => {
+        console.warn('[ChatQa] Seed failed:', err.message);
+      });
       
       // Register global plugin to publish to Centrifugo on any mutation
       mongoose.plugin((schema) => {

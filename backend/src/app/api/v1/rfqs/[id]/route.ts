@@ -120,9 +120,14 @@ export async function GET(req: NextRequest, { params }: Params) {
           bids: i.bids ? i.bids.map((b: any) => ({
             ...b,
             id: b._id.toString(),
-            supplierCompany: b.supplierCompany ? {
-              name: b.supplierCompany.name
-            } : null
+            supplierCompany: b.supplierCompany
+              ? {
+                  id: b.supplierCompanyId?.toString() || b.supplierCompany._id?.toString(),
+                  name: b.supplierCompany.name,
+                }
+              : b.supplierCompanyId
+                ? { id: b.supplierCompanyId.toString(), name: 'Supplier' }
+                : null,
           })) : []
         })) : []
       };

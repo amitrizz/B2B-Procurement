@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Building, Shield, Lock, Save, Sparkles, Mail, CheckCircle, Clock, Users, Link, Upload, FileText, Eye, X, MessageCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Building, Shield, Lock, Save, Sparkles, Mail, CheckCircle, Clock, Users, Link, Upload, FileText, Eye, X, MessageCircle, Landmark } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -28,6 +28,89 @@ export default function ProfileTab({ user, setUser, showToast }: ProfileTabProps
   // KYC state
   const [kycLoading, setKycLoading] = useState<string | null>(null);
   const [viewingFileId, setViewingFileId] = useState<string | null>(null);
+
+  // Bank details (required for suppliers to accept POs)
+  const [bankAccountName, setBankAccountName] = useState('');
+  const [bankIfsc, setBankIfsc] = useState('');
+  const [bankAccountNumber, setBankAccountNumber] = useState('');
+  const [bankLast4, setBankLast4] = useState<string | null>(null);
+  const [bankLoading, setBankLoading] = useState(true);
+  const [bankSaving, setBankSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setBankLoading(true);
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/v1/company/me/bank', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (cancelled || !data.success) return;
+        if (data.data) {
+          setBankAccountName(data.data.accountName || '');
+          setBankIfsc(data.data.ifsc || '');
+          setBankLast4(data.data.accountNumberLast4 || null);
+        }
+      } catch {
+        // ignore — form stays empty
+      } finally {
+        if (!cancelled) setBankLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSaveBankDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+    if (!bankAccountName.trim()) {
+      showToast('Account holder name is required', 'error');
+      return;
+    }
+    if (!ifscRegex.test(bankIfsc.trim().toUpperCase())) {
+      showToast('Invalid IFSC format. Example: HDFC0001234', 'error');
+      return;
+    }
+    const digitsOnly = bankAccountNumber.replace(/\D/g, '');
+    if (digitsOnly.length < 4) {
+      showToast('Enter a valid bank account number', 'error');
+      return;
+    }
+
+    setBankSaving(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/v1/company/me/bank', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          accountName: bankAccountName.trim(),
+          ifsc: bankIfsc.trim().toUpperCase(),
+          accountNumber: digitsOnly,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        showToast(data.message || 'Failed to save bank details', 'error');
+        return;
+      }
+      setBankLast4(data.data?.accountNumberLast4 || digitsOnly.slice(-4));
+      setBankAccountNumber('');
+      showToast('Bank details saved — you can now accept purchase orders', 'success');
+    } catch {
+      showToast('Failed to save bank details', 'error');
+    } finally {
+      setBankSaving(false);
+    }
+  };
 
   const handleKycUpload = async (e: React.ChangeEvent<HTMLInputElement>, documentType: string) => {
     const file = e.target.files?.[0];
@@ -203,8 +286,8 @@ export default function ProfileTab({ user, setUser, showToast }: ProfileTabProps
   return (
     <div className="space-y-8 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-white">Profile Settings</h1>
-        <p className="text-xs text-slate-400">Manage your B2B account details, company GSTIN and password security.</p>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">Profile Settings</h1>
+        <p className="text-xs text-slate-400">Manage your company profile, bank details for payouts, KYC, and password security.</p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-8">
@@ -315,6 +398,78 @@ export default function ProfileTab({ user, setUser, showToast }: ProfileTabProps
           </form>
         </Card>
       </div>
+
+      {/* Bank Details — required for suppliers to accept POs */}
+      {user?.company && (user?.role === 'OWNER' || user?.role === 'PLATFORM_ADMIN') && (
+        <Card>
+          <div className="flex items-center gap-2 pb-4 border-b border-white/5">
+            <Landmark className="w-5 h-5 text-emerald-400" />
+            <h3 className="font-bold text-base text-white">Bank Details</h3>
+          </div>
+          <p className="text-xs text-slate-400 mt-4 mb-4">
+            Required before you can accept purchase orders as a supplier. Used for platform settlement payouts.
+          </p>
+
+          {bankLoading ? (
+            <p className="text-xs text-slate-500 py-4">Loading bank details…</p>
+          ) : (
+            <form onSubmit={handleSaveBankDetails} className="grid md:grid-cols-2 gap-4 max-w-2xl">
+              {bankLast4 && (
+                <div className="md:col-span-2 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-200 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 shrink-0 text-emerald-400" />
+                  <span>
+                    Bank account on file ending in <span className="font-mono font-bold">••••{bankLast4}</span>.
+                    Re-enter the full account number below to update.
+                  </span>
+                </div>
+              )}
+
+              {!bankLast4 && (
+                <div className="md:col-span-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-200">
+                  No bank details saved yet. Add your account to accept POs on the Purchase Orders tab.
+                </div>
+              )}
+
+              <Input
+                label="Account Holder Name"
+                required
+                value={bankAccountName}
+                onChange={(e) => setBankAccountName(e.target.value)}
+                placeholder="As per bank records"
+                icon={<Building className="w-3.5 h-3.5 text-slate-500" />}
+              />
+
+              <Input
+                label="IFSC Code"
+                required
+                value={bankIfsc}
+                onChange={(e) => setBankIfsc(e.target.value.toUpperCase())}
+                placeholder="HDFC0001234"
+                icon={<Landmark className="w-3.5 h-3.5 text-slate-500" />}
+                className="font-mono"
+              />
+
+              <Input
+                label="Account Number"
+                required
+                type="password"
+                autoComplete="off"
+                value={bankAccountNumber}
+                onChange={(e) => setBankAccountNumber(e.target.value.replace(/\D/g, ''))}
+                placeholder={bankLast4 ? `Re-enter full account number (ends ••••${bankLast4})` : 'Enter bank account number'}
+                className="font-mono md:col-span-2"
+              />
+
+              <div className="md:col-span-2">
+                <Button type="submit" disabled={bankSaving} variant="primary" className="w-full md:w-auto">
+                  {bankSaving ? 'Saving…' : bankLast4 ? 'Update Bank Details' : 'Save Bank Details'}
+                  <Save className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </form>
+          )}
+        </Card>
+      )}
 
       {/* KYC Documents */}
       {user?.company && user?.role === 'OWNER' && (

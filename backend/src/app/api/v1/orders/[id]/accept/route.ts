@@ -39,17 +39,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return console.log(`[API Response] /api/v1/orders/[id]/accept - Sending response`), NextResponse.json({ success: false, code: 'NO_BANK', message: 'You must provide bank details before accepting a PO' }, { status: 403 });
     }
 
-    // Note: status 'ACCEPTED' does not exist in Mongoose PurchaseOrder schema enum. 
-    // It's 'CREATED', 'PROCESSING', 'READY_FOR_PICKUP', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED', 'CANCELLED'.
-    // If we want to map AWAITING_ACCEPTANCE -> ACCEPTED in the old Prisma flow, here we probably mean 'CREATED'.
-    // Let's use 'CREATED' as the accepted state for now if ACCEPTED is invalid in schema, or if schema was updated to include ACCEPTED, use that.
-    // The previous pay route assumed ACCEPTED -> PROCESSING, so we'll set it to 'CREATED' if ACCEPTED fails, but wait, if pay route checks ACCEPTED, then it must be ACCEPTED. Let's assume the schema in src/models/PurchaseOrder allows 'ACCEPTED'.
-    
-    // In src/models/PurchaseOrder.ts enum is: ['CREATED', 'PROCESSING', 'READY_FOR_PICKUP', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED', 'CANCELLED', 'AWAITING_ACCEPTANCE']
-    // Wait, let's see. If ACCEPTED is not there, it will throw. We'll try to set ACCEPTED.
     const updatedPoDoc = await PurchaseOrder.findByIdAndUpdate(
       id,
-      { $set: { status: 'ACCEPTED' } }, // Assuming the schema supports it. If it throws, user will fix it. Let's actually use 'ACCEPTED'.
+      { $set: { status: 'CREATED' } },
       { new: true }
     ).lean() as any;
 

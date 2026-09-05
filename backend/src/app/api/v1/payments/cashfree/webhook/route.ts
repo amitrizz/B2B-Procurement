@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { confirmInvoicePayment } from '@/lib/confirmInvoicePayment';
-import { fetchCashfreeOrder } from '@/lib/cashfreeClient';
+import { fetchCashfreeOrder, isCashfreeOrderPaid, resolveInvoiceIdFromCashfreeOrder } from '@/lib/cashfreeClient';
 import { verifyCashfreeWebhookSignature } from '@/lib/cashfreeWebhook';
 
 /** Cashfree payment webhook (server-to-server). */
@@ -32,11 +32,11 @@ export async function POST(req: NextRequest) {
     }
 
     const cfOrder = await fetchCashfreeOrder(String(orderId));
-    if (String(cfOrder.order_status || '').toUpperCase() !== 'PAID') {
+    if (!isCashfreeOrderPaid(cfOrder)) {
       return NextResponse.json({ success: true, message: 'not paid yet' });
     }
 
-    const invoiceId = cfOrder.order_tags?.invoice_id;
+    const invoiceId = resolveInvoiceIdFromCashfreeOrder(cfOrder);
     if (!invoiceId) {
       return NextResponse.json({ success: true, message: 'no invoice tag' });
     }

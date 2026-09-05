@@ -1,7 +1,7 @@
 /**
  * Singleton Centrifugo WebSocket client.
  */
-import { Centrifuge, type CentrifugeOptions } from 'centrifuge';
+import { Centrifuge } from 'centrifuge';
 import { shouldDeliverEventToCompany } from './realtimeNotifications';
 
 interface CentrifugoState {
@@ -145,7 +145,7 @@ export async function connectCentrifugo(authToken: string, companyId: string) {
       token: data.token,
       minReconnectDelay: 1000,
       maxReconnectDelay: 20000,
-    } as CentrifugeOptions);
+    });
 
     centrifuge.on('connected', () => {
       state.connected = true;

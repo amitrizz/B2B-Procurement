@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Plus, ShoppingCart, Search, Building } from 'lucide-react';
+import { Plus, ShoppingCart, Search, Building } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { RefreshButton } from '@/components/ui/RefreshButton';
+import { computeBuyerPricing, formatInrFromPaise } from '@/lib/platformPricing';
 
 interface CatalogTabProps {
   catalogItems: any[];
@@ -114,9 +116,7 @@ export default function CatalogTab({
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={fetchData} className="p-2.5 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all flex items-center justify-center">
-            <RefreshCw className="w-4 h-4 text-slate-300" />
-          </button>
+          <RefreshButton onRefresh={fetchData} />
           {mode === 'seller' && (
             <Button variant="primary" onClick={() => setShowAddModal(true)}>
               <Plus className="w-4 h-4 mr-2" /> Add Item
@@ -183,8 +183,8 @@ export default function CatalogTab({
               <Input label="Valid For (Days)" type="number" min="1" required value={validToDays} onChange={e => setValidToDays(Number(e.target.value))} />
               <div className="flex gap-3 pt-4 border-t border-white/10 mt-6">
                 <Button type="button" variant="secondary" className="flex-1" onClick={() => setShowAddModal(false)}>Cancel</Button>
-                <Button type="submit" variant="primary" className="flex-1" disabled={loading}>
-                  {loading ? 'Saving...' : 'Add Item'}
+                <Button type="submit" variant="primary" className="flex-1" loading={loading} disabled={loading}>
+                  Add Item
                 </Button>
               </div>
             </form>
@@ -209,17 +209,27 @@ export default function CatalogTab({
               <Input label="Order Quantity" type="number" min={1} required value={orderQty} onChange={e => setOrderQty(Number(e.target.value))} />
 
               <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-                <div className="flex justify-between text-sm font-bold text-blue-400">
-                  <span>Estimated Total:</span>
-                  <span>₹{((orderQty * Number(showOrderModal.unitPrice) * 1.23) / 100).toLocaleString('en-IN')}</span>
-                </div>
-                <div className="text-[10px] text-slate-500 text-right mt-1">Includes 5% platform fee + GST on fee</div>
+                {(() => {
+                  const goodsPaise = orderQty * Number(showOrderModal.unitPrice);
+                  const pricing = computeBuyerPricing(goodsPaise);
+                  return (
+                    <>
+                      <div className="flex justify-between text-sm font-bold text-blue-400">
+                        <span>Estimated Total:</span>
+                        <span>₹{formatInrFromPaise(pricing.buyerTotalPaise)}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 text-right mt-1">
+                        Quote ₹{formatInrFromPaise(pricing.goodsPaise)} + platform fee ₹{formatInrFromPaise(pricing.commissionPaise)} + GST ₹{formatInrFromPaise(pricing.feeGstPaise)}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
               <div className="flex gap-3 pt-4 border-t border-white/10 mt-6">
                 <Button type="button" variant="secondary" className="flex-1" onClick={() => setShowOrderModal(null)}>Cancel</Button>
-                <Button type="submit" variant="primary" className="flex-1" disabled={loading}>
-                  {loading ? 'Processing...' : 'Create Order'}
+                <Button type="submit" variant="primary" className="flex-1" loading={loading} disabled={loading}>
+                  Create Order
                 </Button>
               </div>
             </form>

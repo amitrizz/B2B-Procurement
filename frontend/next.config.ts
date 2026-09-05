@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
   async rewrites() {
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
     if (!backendUrl) return [];
@@ -49,6 +50,10 @@ const nextConfig: NextConfig = {
       {
         source: "/prs",
         destination: "/dashboard/prs",
+      },
+      {
+        source: "/chat",
+        destination: "/dashboard/chat",
       },
     ];
   },

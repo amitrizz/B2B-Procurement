@@ -23,6 +23,11 @@ export async function GET(req: NextRequest) {
     const whereClause: any = {
       status: 'PUBLISHED',
       bidEndAt: { $gt: new Date() },
+      $or: [
+        { invitedSupplierCompanyId: { $exists: false } },
+        { invitedSupplierCompanyId: null },
+        { invitedSupplierCompanyId: new mongoose.Types.ObjectId(user.companyId) },
+      ],
     };
 
     if (category) {

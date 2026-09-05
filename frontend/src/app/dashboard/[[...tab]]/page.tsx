@@ -3,14 +3,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { onCentrifugoEvent } from '@/lib/centrifugoClient';
-import { applyCompanyToUser, getCompanyIdFromUser, persistUser, patchUserCompany } from '@/lib/userSession';
-import { resolveToastType } from '@/lib/realtimeNotifications';
+import { applyCompanyToUser, getCompanyIdFromUser, persistUser, patchUserCompany, readDashboardMode, persistDashboardMode, type DashboardMode } from '@/lib/userSession';
+import { resolveToastType, isIncomingChatEvent } from '@/lib/realtimeNotifications';
 import { getDefaultRouteForRole, getRouteForTab, isTabAllowedForRole } from '@/lib/roleRouting';
 import { 
   Building, LogOut, CheckCircle, Clock, ShoppingCart, 
   Plus, Users, FileText, ChevronRight, Truck, Info,
   Search, ShieldAlert, Star, RefreshCw, ArrowLeft,
-  Menu, X, User, Loader2
+  Menu, X, User, Loader2, MessageSquare
 } from 'lucide-react';
 
 import MarketplaceTab from '../components/MarketplaceTab';
@@ -18,11 +18,11 @@ import MyRequirementsTab from '../components/MyRequirementsTab';
 import PurchaseOrdersTab from '../components/PurchaseOrdersTab';
 import LocalDeliveryTab from '../components/LocalDeliveryTab';
 import AdminTab from '../components/AdminTab';
-import AdminUsersTab from '../components/AdminUsersTab';
 import StandardCatalogTab from '../components/StandardCatalogTab';
 import ProfileTab from '../components/ProfileTab';
 import RequisitionsTab from '../components/RequisitionsTab';
 import CatalogTab from '../components/CatalogTab';
+import CompanyChatTab from '../components/CompanyChatTab';
 
 let refreshTokenPromise: Promise<any> | null = null;
 
@@ -44,6 +44,7 @@ export default function Dashboard() {
   let activeTab = 'marketplace';
   if (tabName === 'rfqs') activeTab = 'my_rfqs';
   else if (tabName === 'delivery') activeTab = 'transporter';
+  else if (tabName === 'chat') activeTab = 'company_chat';
   else if (tabName) activeTab = tabName;
 
   const companyId = getCompanyIdFromUser(user);
@@ -67,6 +68,7 @@ export default function Dashboard() {
   const [prs, setPrs] = useState<any[]>([]);
   const [catalogItems, setCatalogItems] = useState<any[]>([]);
   const [adminPayments, setAdminPayments] = useState<any[]>([]);
+  const [adminInvoices, setAdminInvoices] = useState<any[]>([]);
   const [companyComponents, setCompanyComponents] = useState<any[]>([]);
   const [companyCategories, setCompanyCategories] = useState<any[]>([]);
 
@@ -96,6 +98,8 @@ export default function Dashboard() {
   const [submittingActions, setSubmittingActions] = useState<Record<string, boolean>>({});
   const [msg, setMsg] = useState({ type: '', text: '' });
   const [toasts, setToasts] = useState<{ id: string; type: 'success' | 'error' | 'info'; text: string }[]>([]);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const [chatRealtimeEvent, setChatRealtimeEvent] = useState<any>(null);
 
   const withLoading = async (actionId: string, fn: () => Promise<void>) => {
     setSubmittingActions(prev => ({ ...prev, [actionId]: true }));
@@ -106,7 +110,17 @@ export default function Dashboard() {
     }
   };
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
-  const [mode, setMode] = useState<'buyer' | 'seller'>('buyer');
+  const [mode, setModeState] = useState<DashboardMode>('buyer');
+
+  const setMode = (next: DashboardMode) => {
+    setModeState(next);
+    persistDashboardMode(next, getCompanyIdFromUser(user));
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    setModeState(readDashboardMode(getCompanyIdFromUser(user)));
+  }, [user?.id, companyId]);
 
   const showToast = (text: string, type: 'success' | 'error' | 'info' = 'info') => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -232,10 +246,13 @@ export default function Dashboard() {
     const storedUser = localStorage.getItem('user');
     const token = localStorage.getItem('token');
     if (!storedUser || !token) {
+      setCheckingAuth(false);
       router.push('/');
-    } else {
+      return;
+    }
       const parsed = JSON.parse(storedUser);
       setUser(parsed);
+      setModeState(readDashboardMode(getCompanyIdFromUser(parsed)));
       setCheckingAuth(false);
       const companyId = getCompanyIdFromUser(parsed);
       if (companyId) {
@@ -266,8 +283,15 @@ export default function Dashboard() {
           })
           .catch(err => console.error(err));
       }
-    }
   }, [router]);
+
+  // Redirect legacy admin users route into unified admin portal
+  useEffect(() => {
+    if (!user || checkingAuth) return;
+    if (user.role === 'PLATFORM_ADMIN' && activeTab === 'admin_users') {
+      router.replace('/admin');
+    }
+  }, [user, checkingAuth, activeTab, router]);
 
   // Redirect users away from tabs their role cannot access
   useEffect(() => {
@@ -286,6 +310,12 @@ export default function Dashboard() {
       fetchData();
     }
   }, [activeTab, mode, user?.id]);
+
+  useEffect(() => {
+    if (activeTab === 'company_chat') {
+      setChatUnreadCount(0);
+    }
+  }, [activeTab]);
 
   // Real-time updates — apply payload immediately, then refresh from API
   useEffect(() => {
@@ -311,12 +341,23 @@ export default function Dashboard() {
         });
       }
 
-      if (data?.message) {
-        showToast(data.message, resolveToastType(data));
+      if (data?.eventType === 'chat_message') {
+        setChatRealtimeEvent({ ...data, _at: Date.now() });
+        if (isIncomingChatEvent(data, companyId)) {
+          if (activeTab !== 'company_chat') {
+            setChatUnreadCount((c) => c + 1);
+          }
+          if (data.message) {
+            showToast(data.message, resolveToastType(data));
+          }
+        }
+      } else {
+        if (data?.message) {
+          showToast(data.message, resolveToastType(data));
+        }
+        refreshCompanyProfile();
+        if (fetchDataRef.current) fetchDataRef.current(true);
       }
-
-      refreshCompanyProfile();
-      if (fetchDataRef.current) fetchDataRef.current(true);
     });
 
     // Setup Web Push Notifications
@@ -346,7 +387,7 @@ export default function Dashboard() {
     return () => {
       unsub();
     };
-  }, [companyId]);
+  }, [companyId, activeTab]);
 
   const fetchData = async (isBackground = false) => {
     if (!isBackground) setLoading(true);
@@ -396,12 +437,18 @@ export default function Dashboard() {
           console.error('Admin payments fetch failed:', dPay.message);
           setAdminPayments([]);
         }
-      }
 
-      if (activeTab === 'admin_users' && user?.role === 'PLATFORM_ADMIN') {
-        const res = await fetch(`/api/v1/admin/users?_t=${Date.now()}`, fetchOpts);
-        const d = await res.json();
-        if (d.success) setAdminUsers(d.data);
+        const resInv = await fetch(`/api/v1/admin/invoices?_t=${Date.now()}`, fetchOpts);
+        const dInv = await resInv.json();
+        if (dInv.success) setAdminInvoices(dInv.data || []);
+
+        const resUsers = await fetch(`/api/v1/admin/users?_t=${Date.now()}`, fetchOpts);
+        const dUsers = await resUsers.json();
+        if (dUsers.success) setAdminUsers(dUsers.data || []);
+
+        const resDel = await fetch(`/api/v1/transporter/deliveries?_t=${Date.now()}`, fetchOpts);
+        const dDel = await resDel.json();
+        if (dDel.success) setDeliveries(dDel.data);
       }
 
       if (activeTab === 'transporter') {
@@ -890,24 +937,24 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex-1 flex flex-col md:flex-row h-screen overflow-hidden relative">
+    <div className="flex-1 flex flex-col md:flex-row h-dvh max-h-dvh overflow-hidden relative">
       {/* Mobile Top Header */}
-      <div className="md:hidden bg-slate-900 border-b border-white/5 px-6 py-4 flex flex-col space-y-3 z-40">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Building className="w-5 h-5 text-blue-500" />
-            <span className="font-extrabold text-xs text-white uppercase tracking-wider flex items-center gap-1.5">
+      <div className="md:hidden bg-slate-900 border-b border-white/5 px-4 py-3 flex flex-col space-y-3 z-40 shrink-0 pt-safe">
+        <div className="flex items-center justify-between gap-2 min-w-0">
+          <div className="flex items-center space-x-2 min-w-0 flex-1">
+            <Building className="w-5 h-5 text-blue-500 shrink-0" />
+            <span className="font-extrabold text-xs text-white uppercase tracking-wider flex items-center gap-1.5 min-w-0 truncate">
               {user.company?.name || 'Platform Admin'}
               {user.company && (user.company.isActive !== false ? (
-                <span className="px-1.5 py-0.5 bg-green-500/10 text-green-400 border border-green-500/20 rounded text-[9px] font-bold">ACTIVE</span>
+                <span className="px-1.5 py-0.5 bg-green-500/10 text-green-400 border border-green-500/20 rounded text-[9px] font-bold shrink-0">ACTIVE</span>
               ) : (
-                <span className="px-1.5 py-0.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded text-[9px] font-bold">INACTIVE</span>
+                <span className="px-1.5 py-0.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded text-[9px] font-bold shrink-0">INACTIVE</span>
               ))}
             </span>
           </div>
           <button
             onClick={handleLogout}
-            className="py-1 px-2.5 bg-red-500/10 border border-red-500/20 hover:bg-red-600 hover:text-white text-red-400 rounded-lg text-[10px] font-semibold flex items-center gap-1 transition-all"
+            className="py-1 px-2.5 bg-red-500/10 border border-red-500/20 hover:bg-red-600 hover:text-white text-red-400 rounded-lg text-[10px] font-semibold flex items-center gap-1 transition-all shrink-0"
           >
             <LogOut className="w-3 h-3" />
             <span>Sign Out</span>
@@ -1024,6 +1071,21 @@ export default function Dashboard() {
                   <ShoppingCart className="w-4 h-4" />
                   <span>Purchase Orders</span>
                 </button>
+
+                {user.role !== 'PLATFORM_ADMIN' && user.role !== 'TRANSPORTER' && (
+                  <button
+                    onClick={() => handleTabChange('company_chat')}
+                    className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'company_chat' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    <span className="flex-1">Company Chat</span>
+                    {chatUnreadCount > 0 && (
+                      <span className="min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">
+                        {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+                      </span>
+                    )}
+                  </button>
+                )}
               </>
             )}
 
@@ -1046,22 +1108,13 @@ export default function Dashboard() {
             </button>
 
             {user.role === 'PLATFORM_ADMIN' && (
-              <>
-                <button
-                  onClick={() => handleTabChange('admin')}
-                  className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'admin' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
-                >
-                  <Users className="w-4 h-4" />
-                  <span>KYC & Platform Admin</span>
-                </button>
-                <button
-                  onClick={() => handleTabChange('admin_users')}
-                  className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'admin_users' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
-                >
-                  <Users className="w-4 h-4" />
-                  <span>List of Users</span>
-                </button>
-              </>
+              <button
+                onClick={() => handleTabChange('admin')}
+                className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'admin' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:text-white'}`}
+              >
+                <Users className="w-4 h-4" />
+                <span>Platform Admin</span>
+              </button>
             )}
           </div>
         </div>
@@ -1076,9 +1129,10 @@ export default function Dashboard() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-y-auto bg-slate-950 p-6 md:p-10 pb-24 md:pb-10">
+      <div className="flex-1 flex flex-col overflow-y-auto bg-slate-950 p-4 md:p-10 pb-24 md:pb-10 min-h-0">
         
         {/* Top Header Bar for Desktop */}
+        {activeTab !== 'admin' && (
         <div className="hidden md:flex justify-between items-center pb-6 border-b border-white/5 mb-6">
           <div>
             <h2 className="text-xl font-bold text-white">Dashboard Portal</h2>
@@ -1103,6 +1157,7 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+        )}
 
         {msg.text && (
           <div className={`p-4 mb-6 rounded-xl border text-sm flex items-center justify-between ${msg.type === 'success' ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
@@ -1152,6 +1207,7 @@ export default function Dashboard() {
             handleSelectWinner={handleSelectWinner}
             handleViewRfqDetails={handleViewRfqDetails}
             mode={mode}
+            showToast={showToast}
           />
         )}
 
@@ -1167,6 +1223,12 @@ export default function Dashboard() {
           />
         )}
 
+        {activeTab === 'company_chat' &&
+          user.role !== 'PLATFORM_ADMIN' &&
+          user.role !== 'TRANSPORTER' && (
+            <CompanyChatTab user={user} showToast={showToast} realtimeEvent={chatRealtimeEvent} />
+          )}
+
         {activeTab === 'transporter' && (user.role === 'PLATFORM_ADMIN' || user.role === 'TRANSPORTER') && (
           <LocalDeliveryTab
             deliveries={deliveries}
@@ -1181,15 +1243,14 @@ export default function Dashboard() {
           <AdminTab
             adminCompanies={adminCompanies}
             adminPayments={adminPayments}
+            adminUsers={adminUsers}
+            adminInvoices={adminInvoices}
+            sampleDeliveries={(deliveries || []).filter(
+              (d: any) => d.purpose === 'SAMPLE' || d.purchaseOrder?.orderType === 'SAMPLE'
+            )}
             fetchData={fetchData}
             handleVerifyCompany={handleVerifyCompany}
-          />
-        )}
-
-        {activeTab === 'admin_users' && user.role === 'PLATFORM_ADMIN' && (
-          <AdminUsersTab
-            adminUsers={adminUsers}
-            fetchData={fetchData}
+            onOpenDeliveryPortal={() => handleTabChange('transporter')}
           />
         )}
 
@@ -1440,7 +1501,7 @@ export default function Dashboard() {
       )}
 
       {/* Toast Container */}
-      <div className="fixed top-5 right-5 z-[60] flex flex-col gap-2 pointer-events-none">
+      <div className="fixed top-16 left-4 right-4 md:top-5 md:right-5 md:left-auto z-[60] flex flex-col gap-2 pointer-events-none max-w-sm md:max-w-md">
         {toasts.map(t => (
           <div
             key={t.id}
@@ -1458,43 +1519,90 @@ export default function Dashboard() {
       </div>
 
       {/* Mobile Bottom Navigation Bar */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-905/98 backdrop-blur-md border-t border-white/5 z-40 grid grid-cols-5 py-2 px-1 pb-safe">
-        <button 
-          onClick={() => handleTabChange('marketplace')} 
-          className={`flex flex-col items-center justify-center py-1 text-[9px] font-semibold transition-all ${activeTab === 'marketplace' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
+      {user.role === 'TRANSPORTER' ? (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-950/98 backdrop-blur-md border-t border-white/5 z-40 grid grid-cols-3 py-1.5 px-1 pb-safe">
+          <button
+            type="button"
+            onClick={() => handleTabChange('transporter')}
+            className={`mobile-nav-btn flex flex-col items-center justify-center py-1 text-[9px] font-semibold transition-all ${activeTab === 'transporter' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
+          >
+            <Truck className="w-4 h-4 mb-0.5" />
+            <span>Deliveries</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange('profile')}
+            className={`mobile-nav-btn flex flex-col items-center justify-center py-1 text-[9px] font-semibold transition-all ${activeTab === 'profile' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
+          >
+            <User className="w-4 h-4 mb-0.5" />
+            <span>Profile</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowMobileSidebar(true)}
+            className="mobile-nav-btn flex flex-col items-center justify-center py-1 text-[9px] font-semibold text-slate-400 transition-all hover:text-blue-400"
+          >
+            <Menu className="w-4 h-4 mb-0.5" />
+            <span>Menu</span>
+          </button>
+        </div>
+      ) : (
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-950/98 backdrop-blur-md border-t border-white/5 z-40 grid grid-cols-6 py-1.5 px-0.5 pb-safe">
+        <button
+          type="button"
+          onClick={() => handleTabChange('marketplace')}
+          className={`mobile-nav-btn flex flex-col items-center justify-center py-1 text-[8px] font-semibold transition-all ${activeTab === 'marketplace' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
         >
           <Search className="w-4 h-4 mb-0.5" />
-          <span className="truncate">Market</span>
+          <span className="truncate max-w-full px-0.5">Market</span>
         </button>
-        <button 
-          onClick={() => handleTabChange('my_rfqs')} 
-          className={`flex flex-col items-center justify-center py-1 text-[9px] font-semibold transition-all ${activeTab === 'my_rfqs' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
+        <button
+          type="button"
+          onClick={() => handleTabChange('my_rfqs')}
+          className={`mobile-nav-btn flex flex-col items-center justify-center py-1 text-[8px] font-semibold transition-all ${activeTab === 'my_rfqs' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
         >
           <FileText className="w-4 h-4 mb-0.5" />
-          <span className="truncate">{mode === 'buyer' ? 'Reqs' : 'Bids'}</span>
+          <span className="truncate max-w-full px-0.5">{mode === 'buyer' ? 'Reqs' : 'Bids'}</span>
         </button>
-        <button 
-          onClick={() => handleTabChange('orders')} 
-          className={`flex flex-col items-center justify-center py-1 text-[9px] font-semibold transition-all ${activeTab === 'orders' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
+        <button
+          type="button"
+          onClick={() => handleTabChange('orders')}
+          className={`mobile-nav-btn flex flex-col items-center justify-center py-1 text-[8px] font-semibold transition-all ${activeTab === 'orders' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
         >
           <ShoppingCart className="w-4 h-4 mb-0.5" />
-          <span className="truncate">Orders</span>
+          <span className="truncate max-w-full px-0.5">Orders</span>
         </button>
-        <button 
-          onClick={() => handleTabChange('profile')} 
-          className={`flex flex-col items-center justify-center py-1 text-[9px] font-semibold transition-all ${activeTab === 'profile' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
+        <button
+          type="button"
+          onClick={() => handleTabChange('company_chat')}
+          className={`mobile-nav-btn relative flex flex-col items-center justify-center py-1 text-[8px] font-semibold transition-all ${activeTab === 'company_chat' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
+        >
+          <MessageSquare className="w-4 h-4 mb-0.5" />
+          <span className="truncate max-w-full px-0.5">Chat</span>
+          {chatUnreadCount > 0 && (
+            <span className="absolute top-0 right-1 min-w-[14px] h-[14px] px-0.5 rounded-full bg-red-500 text-white text-[8px] font-bold flex items-center justify-center">
+              {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => handleTabChange('profile')}
+          className={`mobile-nav-btn flex flex-col items-center justify-center py-1 text-[8px] font-semibold transition-all ${activeTab === 'profile' ? 'text-blue-400 font-bold' : 'text-slate-400'}`}
         >
           <User className="w-4 h-4 mb-0.5" />
-          <span className="truncate">Profile</span>
+          <span className="truncate max-w-full px-0.5">Profile</span>
         </button>
-        <button 
-          onClick={() => setShowMobileSidebar(true)} 
-          className="flex flex-col items-center justify-center py-1 text-[9px] font-semibold text-slate-400 transition-all hover:text-blue-400"
+        <button
+          type="button"
+          onClick={() => setShowMobileSidebar(true)}
+          className="mobile-nav-btn flex flex-col items-center justify-center py-1 text-[8px] font-semibold text-slate-400 transition-all hover:text-blue-400"
         >
           <Menu className="w-4 h-4 mb-0.5" />
-          <span className="truncate">Menu</span>
+          <span className="truncate max-w-full px-0.5">Menu</span>
         </button>
       </div>
+      )}
 
       <style jsx global>{`
         @keyframes toastSlideIn {

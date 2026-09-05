@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Plus, Star, ChevronRight, FileText, ShoppingCart, Building } from 'lucide-react';
+import { Plus, Star, ChevronRight, FileText, ShoppingCart, Building, RefreshCw, Loader2 } from 'lucide-react';
+import { ButtonSpinner } from '@/components/ui/ActionButton';
+import SamplingPanel, { SupplierSamplingPanel } from './SamplingPanel';
+import { computeBuyerPricing, formatInrFromPaise, paiseToRupees } from '@/lib/platformPricing';
+import { RefreshButton } from '@/components/ui/RefreshButton';
 
 interface MyRequirementsTabProps {
   rfqs: any[];
@@ -11,6 +15,7 @@ interface MyRequirementsTabProps {
   handleViewRfqDetails: (rfqId: string) => Promise<void>;
   handleEditRfq: (rfq: any) => void;
   mode: 'buyer' | 'seller';
+  showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
 
 export default function MyRequirementsTab({
@@ -22,13 +27,16 @@ export default function MyRequirementsTab({
   handleSelectWinner,
   handleViewRfqDetails,
   handleEditRfq,
-  mode
+  mode,
+  showToast,
 }: MyRequirementsTabProps) {
   const subTab = mode === 'buyer' ? 'buying' : 'selling';
   const [statusFilter, setStatusFilter] = useState<'open' | 'in_progress' | 'closed'>('open');
   const [myBids, setMyBids] = useState<any[]>([]);
   const [loadingBids, setLoadingBids] = useState(false);
   const [awardModal, setAwardModal] = useState<{ rfqItemId: string, bidId: string, maxQty: number, currentQty: number } | null>(null);
+  const [detailsLoadingId, setDetailsLoadingId] = useState<string | null>(null);
+  const [awardLoading, setAwardLoading] = useState(false);
 
   const fetchMyBids = async () => {
     setLoadingBids(true);
@@ -52,16 +60,12 @@ export default function MyRequirementsTab({
     }
   }, [mode]);
 
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
   const handleRefresh = async () => {
-    setIsRefreshing(true);
     if (mode === 'buyer') {
       await fetchData();
     } else {
       await fetchMyBids();
     }
-    setTimeout(() => setIsRefreshing(false), 600);
   };
 
   const filteredRfqs = rfqs.filter((rfq: any) => {
@@ -69,7 +73,7 @@ export default function MyRequirementsTab({
     const isExpired = new Date(rfq.bidEndAt) < new Date();
     
     if (statusFilter === 'open') {
-      return (status === 'PUBLISHED' || status === 'BIDDING_OPEN' || status === 'DRAFT') && !isExpired;
+      return (status === 'PUBLISHED' || status === 'BIDDING_OPEN' || status === 'DRAFT' || status === 'SAMPLING') && !isExpired;
     } else if (statusFilter === 'in_progress') {
       return status === 'PARTIALLY_AWARDED' || status === 'FULLY_AWARDED' || status === 'ORDER_CREATED';
     } else {
@@ -85,7 +89,11 @@ export default function MyRequirementsTab({
     const isRfqAwarded = rfqStatus === 'PARTIALLY_AWARDED' || rfqStatus === 'FULLY_AWARDED' || rfqStatus === 'ORDER_CREATED';
 
     if (statusFilter === 'open') {
-      return bidStatus === 'SUBMITTED' && (rfqStatus === 'PUBLISHED' || rfqStatus === 'BIDDING_OPEN') && !isExpired;
+      return (
+        bidStatus === 'SUBMITTED' &&
+        (rfqStatus === 'PUBLISHED' || rfqStatus === 'BIDDING_OPEN' || rfqStatus === 'SAMPLING') &&
+        !isExpired
+      );
     } else if (statusFilter === 'in_progress') {
       return bidStatus === 'ACCEPTED' && isRfqAwarded;
     } else {
@@ -110,13 +118,7 @@ export default function MyRequirementsTab({
               : 'Monitor quotes and component bids you have submitted to other companies'}
           </p>
         </div>
-        <button 
-          onClick={handleRefresh} 
-          disabled={isRefreshing}
-          className="p-2.5 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all flex items-center justify-center shrink-0"
-        >
-          <RefreshCw className={`w-4 h-4 text-slate-300 ${isRefreshing ? 'animate-spin-once' : ''}`} />
-        </button>
+        <RefreshButton onRefresh={handleRefresh} />
       </div>
 
       {/* Status Filter Sub-Tabs */}
@@ -169,6 +171,15 @@ export default function MyRequirementsTab({
                 <button onClick={() => setSelectedRfqForDetails(null)} className="text-xs text-slate-400 hover:text-white">Close Details</button>
               </div>
 
+              <SamplingPanel
+                rfqId={selectedRfqForDetails.id}
+                rfqNumber={selectedRfqForDetails.rfqNumber}
+                items={selectedRfqForDetails.items}
+                onRefresh={fetchData}
+                onDetailsRefresh={handleViewRfqDetails}
+                showToast={showToast}
+              />
+
               <div className="space-y-6">
                 {selectedRfqForDetails.items.map((item: any) => (
                   <div key={item.id} className="p-4 bg-slate-900/30 rounded-xl border border-white/5 space-y-4">
@@ -193,7 +204,6 @@ export default function MyRequirementsTab({
                                 ) : (
                                   <th className="pb-2 font-semibold">Price (Without Material)</th>
                                 )}
-                                <th className="pb-2 font-semibold">Price</th>
                                 <th className="pb-2 font-semibold">Delivery Time</th>
                                 <th className="pb-2 font-semibold">Rating</th>
                                 <th className="pb-2 font-semibold text-right">Action</th>
@@ -202,25 +212,38 @@ export default function MyRequirementsTab({
                             <tbody>
                               {item.bids.map((bid: any) => {
                                 const qty = Number(item.quantity) || 0;
-                                const totalBase = (Number(item.materialOptionPreference === 'WITH_MATERIAL' ? bid.priceWithMaterial : bid.priceWithoutMaterial) || 0) / 100;
-                                const totalEstimated = totalBase * 1.23; // base + 18% tax + 5% commission
-                                const unitPrice = qty > 0 ? (totalBase / qty) : 0;
+                                const goodsPaise =
+                                  Number(
+                                    item.materialOptionPreference === 'WITH_MATERIAL'
+                                      ? bid.priceWithMaterial
+                                      : bid.priceWithoutMaterial
+                                  ) || 0;
+                                const pricing = computeBuyerPricing(goodsPaise);
+                                const buyerTotal = paiseToRupees(pricing.buyerTotalPaise);
+                                const unitTotal = qty > 0 ? buyerTotal / qty : 0;
+                                const feeLabel = `incl. platform fee ₹${formatInrFromPaise(pricing.commissionPaise)} + GST ₹${formatInrFromPaise(pricing.feeGstPaise)}`;
 
                                 return (
                                   <tr key={bid.id} className="border-b border-white/5 text-slate-300">
                                     <td className="py-2.5 font-medium">{bid.supplierCompany.name}</td>
                                     {item.materialOptionPreference === 'WITH_MATERIAL' ? (
                                       <td className="py-2.5 font-semibold text-blue-400">
-                                        Total: ₹{totalEstimated.toLocaleString()}
+                                        Total: ₹{buyerTotal.toLocaleString('en-IN')}
                                         <span className="text-[10px] font-normal text-slate-500 block">
-                                          ₹{unitPrice.toLocaleString()} / unit
+                                          ₹{unitTotal.toLocaleString('en-IN')} / unit
+                                        </span>
+                                        <span className="text-[9px] font-normal text-slate-500 block">
+                                          {feeLabel}
                                         </span>
                                       </td>
                                     ) : (
                                       <td className="py-2.5 font-semibold text-purple-400">
-                                        Total: ₹{totalEstimated.toLocaleString()}
+                                        Total: ₹{buyerTotal.toLocaleString('en-IN')}
                                         <span className="text-[10px] font-normal text-slate-500 block">
-                                          ₹{unitPrice.toLocaleString()} / unit
+                                          ₹{unitTotal.toLocaleString('en-IN')} / unit
+                                        </span>
+                                        <span className="text-[9px] font-normal text-slate-500 block">
+                                          {feeLabel}
                                         </span>
                                       </td>
                                     )}
@@ -234,7 +257,9 @@ export default function MyRequirementsTab({
                                       ) : (
                                         <button
                                           onClick={() => setAwardModal({ rfqItemId: item.id, bidId: bid.id, maxQty: Number(item.quantity), currentQty: Number(item.quantity) })}
-                                          className="px-3 py-1 bg-green-600/10 border border-green-500/20 text-green-400 hover:bg-green-600 hover:text-white rounded-lg text-[10px] font-bold transition-all"
+                                          disabled={selectedRfqForDetails.status === 'SAMPLING'}
+                                          className="px-3 py-1 bg-green-600/10 border border-green-500/20 text-green-400 hover:bg-green-600 hover:text-white rounded-lg text-[10px] font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                                          title={selectedRfqForDetails.status === 'SAMPLING' ? 'Complete sampling first' : undefined}
                                         >
                                           Award Bid
                                         </button>
@@ -279,11 +304,25 @@ export default function MyRequirementsTab({
                     {statusFilter === 'open' && (
                       <div className="flex gap-2">
                         <button
-                          onClick={() => handleViewRfqDetails(rfq.id)}
-                          className="flex-1 py-2.5 bg-blue-600/10 border border-blue-500/20 text-blue-400 hover:bg-blue-600 hover:text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                          onClick={async () => {
+                            setDetailsLoadingId(rfq.id);
+                            try {
+                              await handleViewRfqDetails(rfq.id);
+                            } finally {
+                              setDetailsLoadingId(null);
+                            }
+                          }}
+                          disabled={detailsLoadingId === rfq.id}
+                          className="flex-1 py-2.5 bg-blue-600/10 border border-blue-500/20 text-blue-400 hover:bg-blue-600 hover:text-white disabled:opacity-60 disabled:cursor-not-allowed rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
                         >
-                          <span>Compare Bids & Select Winner</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
+                          {detailsLoadingId === rfq.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <>
+                              <span>Compare Bids & Select Winner</span>
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            </>
+                          )}
                         </button>
                         <button
                           onClick={() => handleEditRfq(rfq)}
@@ -303,6 +342,8 @@ export default function MyRequirementsTab({
 
       {/* Selling Sub-Tab (Submitted Bids) */}
       {subTab === 'selling' && (
+        <>
+        <SupplierSamplingPanel showToast={showToast} isVisible={subTab === 'selling'} />
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {loadingBids ? (
             <div className="col-span-full py-12 text-center text-slate-400 text-sm flex items-center justify-center gap-2">
@@ -314,9 +355,16 @@ export default function MyRequirementsTab({
           ) : (
             filteredBids.map((bid: any) => {
               const qty = Number(bid.quantity) || 0;
-              const totalBase = Number(bid.materialOptionPreference === 'WITH_MATERIAL' ? bid.priceWithMaterial : bid.priceWithoutMaterial) || 0;
-              const totalEstimated = totalBase * 1.23;
-              const unitPrice = qty > 0 ? (totalBase / qty) : 0;
+              const goodsPaise =
+                Number(
+                  bid.materialOptionPreference === 'WITH_MATERIAL'
+                    ? bid.priceWithMaterial
+                    : bid.priceWithoutMaterial
+                ) || 0;
+              const pricing = computeBuyerPricing(goodsPaise);
+              const totalQuote = paiseToRupees(goodsPaise);
+              const unitPrice = qty > 0 ? totalQuote / qty : 0;
+              const buyerTotal = paiseToRupees(pricing.buyerTotalPaise);
               let displayStatus = bid.status;
               let statusStyle = 'text-blue-400 bg-blue-500/10';
 
@@ -354,12 +402,21 @@ export default function MyRequirementsTab({
                       <div className="flex justify-between mt-2 pt-2 border-t border-white/5">
                         <span className="text-slate-500">Your Quote:</span>
                         <span className="font-bold text-slate-200">
-                          Total: ₹{totalEstimated.toLocaleString()}
+                          Total: ₹{totalQuote.toLocaleString('en-IN')}
                           <span className="text-[10px] font-normal text-slate-400 block text-right">
-                            ₹{unitPrice.toLocaleString()} / unit
+                            ₹{unitPrice.toLocaleString('en-IN')} / unit
                           </span>
                           <span className="text-[9px] font-normal text-slate-500 block text-right">
                             ({bid.materialOptionPreference === 'WITH_MATERIAL' ? 'With Material' : 'Without Material'})
+                          </span>
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Buyer Pays:</span>
+                        <span className="font-semibold text-slate-200 text-right">
+                          ₹{buyerTotal.toLocaleString('en-IN')}
+                          <span className="text-[9px] font-normal text-slate-500 block">
+                            incl. platform fee ₹{formatInrFromPaise(pricing.commissionPaise)} + GST ₹{formatInrFromPaise(pricing.feeGstPaise)}
                           </span>
                         </span>
                       </div>
@@ -374,6 +431,7 @@ export default function MyRequirementsTab({
             })
           )}
         </div>
+        </>
       )}
 
       {/* Award Bid Modal */}
@@ -396,13 +454,21 @@ export default function MyRequirementsTab({
                 <span className="text-[10px] text-slate-500 block mt-1">Max available to award: {awardModal.maxQty}</span>
               </div>
               <button
-                onClick={() => {
-                  handleSelectWinner(awardModal.rfqItemId, awardModal.bidId, awardModal.currentQty);
-                  setAwardModal(null);
+                onClick={async () => {
+                  if (!awardModal) return;
+                  setAwardLoading(true);
+                  try {
+                    await handleSelectWinner(awardModal.rfqItemId, awardModal.bidId, awardModal.currentQty);
+                    setAwardModal(null);
+                  } finally {
+                    setAwardLoading(false);
+                  }
                 }}
-                className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold transition-all active:scale-95 shadow-lg shadow-green-500/20"
+                disabled={awardLoading}
+                className="w-full py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition-all active:scale-95 shadow-lg shadow-green-500/20 flex items-center justify-center gap-2"
               >
-                Confirm Award
+                {awardLoading && <ButtonSpinner />}
+                {awardLoading ? 'Awarding...' : 'Confirm Award'}
               </button>
             </div>
           </div>

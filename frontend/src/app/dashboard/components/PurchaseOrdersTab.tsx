@@ -1,5 +1,15 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { RefreshCw, Clock, Image as ImageIcon, Loader2, X, Sparkles, CheckCircle, Star, FileText } from 'lucide-react';
+import { RefreshButton } from '@/components/ui/RefreshButton';
+import { ButtonSpinner } from '@/components/ui/ActionButton';
+import {
+  clearPaymentReturnQuery,
+  clearPendingPayment,
+  readPaymentReturnParams,
+  readPendingPayment,
+  runCashfreeCheckout,
+  storePendingPayment,
+} from '@/lib/cashfreeCheckout';
 
 const formatInr = (paise: number) =>
   `₹${((paise || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -77,10 +87,39 @@ export default function PurchaseOrdersTab({
   const [viewInvoice, setViewInvoice] = useState<any | null>(null);
   const [loadingInvoice, setLoadingInvoice] = useState(false);
   const [payCheckout, setPayCheckout] = useState<{ order: any; checkout: any } | null>(null);
+  const [payStep, setPayStep] = useState<'summary' | 'gateway'>('summary');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const cashfreeContainerRef = useRef<HTMLDivElement>(null);
+  const checkoutStartedRef = useRef(false);
+
+  const handleAcceptPo = async (orderId: string) => {
+    setActionLoading(`accept-${orderId}`);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/v1/orders/${orderId}/accept`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Purchase order accepted — you can start manufacturing', 'success');
+        fetchData();
+      } else {
+        showToast(data.message || 'Failed to accept PO', 'error');
+      }
+    } catch {
+      showToast('Failed to accept PO', 'error');
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   const getFriendlyStatus = (status: string) => {
     switch (status) {
+      case 'AWAITING_ACCEPTANCE':
+        return 'Awaiting Your Acceptance';
+      case 'ACCEPTED':
+        return 'Accepted — Ready to Start';
       case 'CREATED':
         return 'Order Received';
       case 'PROCESSING_20':
@@ -257,6 +296,28 @@ export default function PurchaseOrdersTab({
     }
   };
 
+  const closePayModal = () => {
+    setPayCheckout(null);
+    setPayStep('summary');
+    checkoutStartedRef.current = false;
+    if (cashfreeContainerRef.current) {
+      cashfreeContainerRef.current.innerHTML = '';
+    }
+  };
+
+  const verifyCashfreePayment = async (invoiceId: string, orderId: string) => {
+    const token = localStorage.getItem('token');
+    const verifyRes = await fetch('/api/v1/payments/cashfree/verify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ invoiceId, orderId }),
+    });
+    return verifyRes.json();
+  };
+
   const handlePayInvoice = async (order: any, invoice: any) => {
     setActionLoading(`pay-${invoice.id}`);
     try {
@@ -274,7 +335,9 @@ export default function PurchaseOrdersTab({
         showToast(data.message || 'Could not start payment', 'error');
         return;
       }
+      storePendingPayment(data.data.invoice.id, data.data.orderId);
       setPayCheckout({ order, checkout: data.data });
+      setPayStep(data.data.stubMode ? 'summary' : 'gateway');
     } catch {
       showToast('Error initializing payment', 'error');
     } finally {
@@ -295,7 +358,8 @@ export default function PurchaseOrdersTab({
       const payData = await payRes.json();
       if (payData.success) {
         showToast('Payment received by platform. Supplier will be paid after verification.', 'success');
-        setPayCheckout(null);
+        clearPendingPayment();
+        closePayModal();
         fetchData();
       } else {
         showToast(payData.message || 'Payment confirmation failed', 'error');
@@ -307,69 +371,80 @@ export default function PurchaseOrdersTab({
     }
   };
 
-  const openCashfreeCheckout = () => {
-    if (!payCheckout) return;
+  const openCashfreeCheckout = useCallback(async () => {
+    if (!payCheckout || payCheckout.checkout.stubMode) return;
     const { checkout } = payCheckout;
+    const container = cashfreeContainerRef.current;
 
-    const loadScript = () =>
-      new Promise<void>((resolve, reject) => {
-        if ((window as any).Cashfree) {
-          resolve();
-          return;
-        }
-        const script = document.createElement('script');
-        script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error('Failed to load Cashfree SDK'));
-        document.body.appendChild(script);
-      });
-
+    setPayStep('gateway');
     setActionLoading(`pay-${checkout.invoice.id}`);
 
-    loadScript()
-      .then(async () => {
-        const token = localStorage.getItem('token');
-        const cashfree = (window as any).Cashfree({
-          mode: checkout.environment === 'production' ? 'production' : 'sandbox',
-        });
+    try {
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-        const result = await cashfree.checkout({
-          paymentSessionId: checkout.paymentSessionId,
-          redirectTarget: '_modal',
-        });
+      const result = await runCashfreeCheckout({
+        paymentSessionId: checkout.paymentSessionId,
+        environment: checkout.environment,
+        container,
+      });
 
-        if (result?.error) {
-          showToast(result.error.message || 'Payment failed', 'error');
-          setActionLoading(null);
-          return;
-        }
+      if (result?.error) {
+        showToast(result.error.message || 'Payment cancelled or failed', 'error');
+        setActionLoading(null);
+        return;
+      }
 
-        const verifyRes = await fetch('/api/v1/payments/cashfree/verify', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            invoiceId: checkout.invoice.id,
-            orderId: checkout.orderId,
-          }),
-        });
-        const verifyData = await verifyRes.json();
+      const verifyData = await verifyCashfreePayment(checkout.invoice.id, checkout.orderId);
+      if (verifyData.success) {
+        showToast('Payment received by platform. Supplier will be paid after verification.', 'success');
+        clearPendingPayment();
+        closePayModal();
+        fetchData();
+      } else {
+        showToast(verifyData.message || 'Payment verification failed', 'error');
+      }
+    } catch {
+      showToast('Could not load payment gateway', 'error');
+    } finally {
+      setActionLoading(null);
+    }
+  }, [payCheckout, fetchData, showToast]);
+
+  useEffect(() => {
+    if (payStep !== 'gateway' || !payCheckout || payCheckout.checkout.stubMode) return;
+    if (checkoutStartedRef.current) return;
+    checkoutStartedRef.current = true;
+    openCashfreeCheckout();
+  }, [payStep, payCheckout, openCashfreeCheckout]);
+
+  useEffect(() => {
+    const returnParams = readPaymentReturnParams();
+    if (!returnParams) return;
+
+    const pending = readPendingPayment();
+    const invoiceId = returnParams.invoiceId || pending?.invoiceId || '';
+    const orderId = returnParams.orderId || pending?.orderId || '';
+
+    setActionLoading('payment-return');
+    verifyCashfreePayment(invoiceId, orderId)
+      .then((verifyData) => {
         if (verifyData.success) {
-          showToast('Payment received by platform. Supplier will be paid after verification.', 'success');
-          setPayCheckout(null);
+          showToast(verifyData.message || 'Payment received by platform.', 'success');
+          clearPendingPayment();
+          closePayModal();
           fetchData();
+        } else if (verifyData.code === 'PAYMENT_PENDING') {
+          showToast('Payment was not completed. You can try again from your order.', 'info');
         } else {
           showToast(verifyData.message || 'Payment verification failed', 'error');
         }
-        setActionLoading(null);
       })
-      .catch(() => {
-        showToast('Could not load Cashfree checkout', 'error');
+      .catch(() => showToast('Payment verification failed', 'error'))
+      .finally(() => {
+        clearPaymentReturnQuery();
         setActionLoading(null);
       });
-  };
+  }, [fetchData, showToast]);
 
   const handleAmendPO = async (orderId: string) => {
     const reason = prompt('Enter reason for amendment (e.g. adjust payment terms):');
@@ -401,14 +476,12 @@ export default function PurchaseOrdersTab({
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Purchase Orders</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">Purchase Orders</h1>
           <p className="text-xs text-slate-400">Track milestones and status transitions for your buying and selling orders</p>
         </div>
-        <button onClick={fetchData} className="p-2.5 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all flex items-center justify-center">
-          <RefreshCw className="w-4 h-4 text-slate-300" />
-        </button>
+        <RefreshButton onRefresh={fetchData} />
       </div>
 
       <div className="space-y-4">
@@ -416,10 +489,15 @@ export default function PurchaseOrdersTab({
           <div className="py-12 text-center text-slate-500 text-sm">No active {mode === 'buyer' ? 'buying' : 'selling'} orders found.</div>
         ) : (
           filteredOrders.map((order: any) => (
-            <div key={order.id} className="glass-card rounded-2xl p-5 border border-white/5 grid md:grid-cols-4 gap-4 items-center">
+            <div key={order.id} className="glass-card rounded-2xl p-4 sm:p-5 border border-white/5 grid grid-cols-1 md:grid-cols-4 gap-4 items-start md:items-center">
               <div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                   <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${order.flowType === 'Buying' ? 'bg-blue-500/15 text-blue-400' : 'bg-purple-500/15 text-purple-400'}`}>{order.flowType}</span>
+                  {order.orderType === 'REPEAT' && (
+                    <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/15 text-amber-300">
+                      Repeat
+                    </span>
+                  )}
                   <span className="text-[10px] text-slate-500 font-semibold">{order.poNumber}</span>
                 </div>
                 <h4 className="font-bold text-sm text-white mt-1.5 font-sans leading-snug">
@@ -518,10 +596,29 @@ export default function PurchaseOrdersTab({
                 </span>
               </div>
 
-              <div className="flex justify-end gap-2">
+              <div className="flex flex-col gap-2 w-full items-stretch sm:items-end md:col-span-1">
                 {order.flowType === 'Selling' && (
-                  <>
-                    {(order.status === 'CREATED' || order.status === 'PROCESSING_20' || order.status === 'PROCESSING_40' || order.status === 'PROCESSING_60') && (
+                  <div className="flex flex-col gap-2 w-full items-stretch sm:items-end">
+                    {order.status === 'AWAITING_ACCEPTANCE' && (
+                      <button
+                        onClick={() => handleAcceptPo(order.id)}
+                        disabled={actionLoading === `accept-${order.id}`}
+                        className="py-1.5 px-3 bg-green-600 hover:bg-green-700 disabled:bg-green-800 text-white rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 w-full sm:w-auto"
+                      >
+                        {actionLoading === `accept-${order.id}` ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Accepting...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            Accept PO
+                          </>
+                        )}
+                      </button>
+                    )}
+                    {(order.status === 'CREATED' || order.status === 'ACCEPTED' || order.status === 'PROCESSING_20' || order.status === 'PROCESSING_40' || order.status === 'PROCESSING_60') && (
                       <div className="relative">
                         <input
                           type="file"
@@ -533,7 +630,7 @@ export default function PurchaseOrdersTab({
                         <button
                           disabled={uploadingOrderId === order.id}
                           onClick={() => document.getElementById(`progress-file-${order.id}`)?.click()}
-                          className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5"
+                          className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 w-full sm:w-auto"
                         >
                           {uploadingOrderId === order.id ? (
                             <>
@@ -541,7 +638,7 @@ export default function PurchaseOrdersTab({
                               Uploading Proof...
                             </>
                           ) : (
-                            order.status === 'CREATED' ? 'Start Processing (20%)' :
+                            order.status === 'CREATED' || order.status === 'ACCEPTED' ? 'Start Processing (20%)' :
                             order.status === 'PROCESSING_20' ? 'Update Progress to 40%' :
                             order.status === 'PROCESSING_40' ? 'Update Progress to 60%' :
                             'Update Progress to 80%'
@@ -561,7 +658,7 @@ export default function PurchaseOrdersTab({
                         <button
                           disabled={uploadingOrderId === order.id}
                           onClick={() => document.getElementById(`work-image-file-${order.id}`)?.click()}
-                          className="py-1.5 px-3 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-800 text-white rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5"
+                          className="py-1.5 px-3 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-800 text-white rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 w-full sm:w-auto"
                         >
                           {uploadingOrderId === order.id ? (
                             <>
@@ -591,14 +688,15 @@ export default function PurchaseOrdersTab({
                           </div>
                         </div>
                       )}
-                  </>
+                  </div>
                 )}
 
                 {order.flowType === 'Buying' && (
-                  <div className="flex flex-col gap-2 items-end">
+                  <div className="flex flex-col gap-2 items-stretch sm:items-end w-full">
                     {/* Buyer Milestone Approvals */}
                     {(order.status === 'ACCEPTED' || order.status === 'CREATED') && (
-                      <button onClick={() => handleAmendPO(order.id)} disabled={actionLoading === `amend-${order.id}`} className="py-1.5 px-3 bg-red-600/20 border border-red-600/50 hover:bg-red-600/40 text-red-400 rounded-lg text-xs font-bold transition-all active:scale-95">
+                      <button onClick={() => handleAmendPO(order.id)} disabled={actionLoading === `amend-${order.id}`} className="py-1.5 px-3 bg-red-600/20 border border-red-600/50 hover:bg-red-600/40 text-red-400 rounded-lg text-xs font-bold transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1.5">
+                        {actionLoading === `amend-${order.id}` && <ButtonSpinner />}
                         {actionLoading === `amend-${order.id}` ? 'Amending...' : 'Amend PO Terms'}
                       </button>
                     )}
@@ -619,8 +717,9 @@ export default function PurchaseOrdersTab({
                             <button
                               onClick={() => handlePayInvoice(order, inv)}
                               disabled={actionLoading === `pay-${inv.id}`}
-                              className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all active:scale-95 shadow-[0_0_15px_rgba(37,99,235,0.5)]"
+                              className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-all active:scale-95 shadow-[0_0_15px_rgba(37,99,235,0.5)] flex items-center gap-1.5"
                             >
+                              {actionLoading === `pay-${inv.id}` && <ButtonSpinner />}
                               {actionLoading === `pay-${inv.id}` ? 'Processing...' : `Pay Platform ${formatInr(getPayableAmount(order))}`}
                             </button>
                           )}
@@ -634,32 +733,45 @@ export default function PurchaseOrdersTab({
                     ))}
 
                     {(order.status === 'PROCESSING_20' && order.milestoneApproved !== '20') && (
-                      <button onClick={() => handleApproveMilestone(order.id, '20')} disabled={actionLoading === `approve-${order.id}`} className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all active:scale-95">
+                      <button onClick={() => handleApproveMilestone(order.id, '20')} disabled={actionLoading === `approve-${order.id}`} className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5">
+                        {actionLoading === `approve-${order.id}` && <ButtonSpinner />}
                         {actionLoading === `approve-${order.id}` ? 'Approving...' : 'Approve 20% Milestone'}
                       </button>
                     )}
                     {(order.status === 'PROCESSING_40' && order.milestoneApproved !== '40') && (
-                      <button onClick={() => handleApproveMilestone(order.id, '40')} disabled={actionLoading === `approve-${order.id}`} className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all active:scale-95">
+                      <button onClick={() => handleApproveMilestone(order.id, '40')} disabled={actionLoading === `approve-${order.id}`} className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5">
+                        {actionLoading === `approve-${order.id}` && <ButtonSpinner />}
                         {actionLoading === `approve-${order.id}` ? 'Approving...' : 'Approve 40% Milestone'}
                       </button>
                     )}
                     {(order.status === 'PROCESSING_60' && order.milestoneApproved !== '60') && (
-                      <button onClick={() => handleApproveMilestone(order.id, '60')} disabled={actionLoading === `approve-${order.id}`} className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all active:scale-95">
+                      <button onClick={() => handleApproveMilestone(order.id, '60')} disabled={actionLoading === `approve-${order.id}`} className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5">
+                        {actionLoading === `approve-${order.id}` && <ButtonSpinner />}
                         {actionLoading === `approve-${order.id}` ? 'Approving...' : 'Approve 60% Milestone'}
                       </button>
                     )}
                     {(order.status === 'PROCESSING_80' && order.milestoneApproved !== '80') && (
-                      <button onClick={() => handleApproveMilestone(order.id, '80')} disabled={actionLoading === `approve-${order.id}`} className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all active:scale-95">
+                      <button onClick={() => handleApproveMilestone(order.id, '80')} disabled={actionLoading === `approve-${order.id}`} className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5">
+                        {actionLoading === `approve-${order.id}` && <ButtonSpinner />}
                         {actionLoading === `approve-${order.id}` ? 'Approving...' : 'Approve 80% Milestone'}
                       </button>
                     )}
 
                     {order.status === 'DELIVERED' && (
                       <button
-                        onClick={() => handleConfirmDelivery(order.id)}
-                        className="py-1.5 px-3 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold transition-all active:scale-95"
+                        onClick={async () => {
+                          setActionLoading(`confirm-${order.id}`);
+                          try {
+                            await handleConfirmDelivery(order.id);
+                          } finally {
+                            setActionLoading(null);
+                          }
+                        }}
+                        disabled={actionLoading === `confirm-${order.id}`}
+                        className="py-1.5 px-3 bg-green-600 hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5"
                       >
-                        Confirm Delivery (GRN)
+                        {actionLoading === `confirm-${order.id}` && <ButtonSpinner />}
+                        {actionLoading === `confirm-${order.id}` ? 'Confirming...' : 'Confirm Delivery (GRN)'}
                       </button>
                     )}
 
@@ -723,8 +835,9 @@ export default function PurchaseOrdersTab({
                   <button
                     onClick={() => handleGenerateInvoice(order.id)}
                     disabled={actionLoading === `invoice-${order.id}`}
-                    className="py-1.5 px-3 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold transition-all active:scale-95"
+                    className="py-1.5 px-3 bg-green-600 hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5"
                   >
+                    {actionLoading === `invoice-${order.id}` && <ButtonSpinner />}
                     {actionLoading === `invoice-${order.id}` ? 'Generating...' : 'Generate Invoices'}
                   </button>
                 )}
@@ -769,10 +882,12 @@ export default function PurchaseOrdersTab({
       {payCheckout && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-          onClick={() => setPayCheckout(null)}
+          onClick={closePayModal}
         >
           <div
-            className="relative max-w-md w-full bg-slate-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl p-6"
+            className={`relative w-full bg-slate-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl p-6 ${
+              payStep === 'gateway' ? 'max-w-lg max-h-[92vh] overflow-y-auto' : 'max-w-md'
+            }`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-start mb-4">
@@ -782,11 +897,13 @@ export default function PurchaseOrdersTab({
                   Invoice {payCheckout.checkout.invoice.number}
                 </p>
               </div>
-              <button onClick={() => setPayCheckout(null)}>
+              <button type="button" onClick={closePayModal}>
                 <X className="w-5 h-5 text-slate-400" />
               </button>
             </div>
 
+            {payStep === 'summary' && (
+              <>
             <div className="space-y-3 text-sm mb-5">
               <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 text-[11px] text-blue-100">
                 {payCheckout.checkout.paymentNote}
@@ -864,7 +981,7 @@ export default function PurchaseOrdersTab({
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setPayCheckout(null)}
+                onClick={closePayModal}
                 className="flex-1 py-2.5 rounded-xl border border-white/10 text-slate-300 text-sm font-semibold hover:bg-white/5"
               >
                 Cancel
@@ -883,16 +1000,53 @@ export default function PurchaseOrdersTab({
               ) : (
                 <button
                   type="button"
-                  onClick={openCashfreeCheckout}
+                  onClick={() => {
+                    checkoutStartedRef.current = false;
+                    setPayStep('gateway');
+                  }}
                   disabled={actionLoading === `pay-${payCheckout.checkout.invoice.id}`}
                   className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold disabled:opacity-60"
                 >
-                  {actionLoading === `pay-${payCheckout.checkout.invoice.id}`
-                    ? 'Opening...'
-                    : `Pay ${formatInr(payCheckout.checkout.invoice.total)}`}
+                  Continue to payment
                 </button>
               )}
             </div>
+              </>
+            )}
+
+            {payStep === 'gateway' && !payCheckout.checkout.stubMode && (
+              <div className="space-y-3">
+                <div className="flex justify-between items-center text-xs text-slate-400">
+                  <span>Secure payment ({payCheckout.checkout.environment})</span>
+                  <span className="font-semibold text-white">
+                    {formatInr(payCheckout.checkout.invoice.total)}
+                  </span>
+                </div>
+                <div
+                  ref={cashfreeContainerRef}
+                  className="min-h-[50vh] sm:min-h-[520px] w-full rounded-xl border border-white/10 bg-white overflow-hidden"
+                />
+                {actionLoading === `pay-${payCheckout.checkout.invoice.id}` && (
+                  <div className="flex items-center justify-center gap-2 text-xs text-slate-400 py-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                    <span>Loading payment…</span>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    checkoutStartedRef.current = false;
+                    setPayStep('summary');
+                    if (cashfreeContainerRef.current) {
+                      cashfreeContainerRef.current.innerHTML = '';
+                    }
+                  }}
+                  className="w-full py-2 rounded-xl border border-white/10 text-slate-400 text-xs hover:bg-white/5"
+                >
+                  Back to summary
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1103,8 +1257,9 @@ export default function PurchaseOrdersTab({
               <button
                 onClick={submitReview}
                 disabled={actionLoading === `review-${reviewOrder.id}`}
-                className="w-full py-3 bg-yellow-500 hover:bg-yellow-600 disabled:bg-yellow-700 text-black rounded-xl font-bold transition-all"
+                className="w-full py-3 bg-yellow-500 hover:bg-yellow-600 disabled:bg-yellow-700 disabled:opacity-60 disabled:cursor-not-allowed text-black rounded-xl font-bold transition-all flex items-center justify-center gap-2"
               >
+                {actionLoading === `review-${reviewOrder.id}` && <ButtonSpinner className="w-4 h-4" />}
                 {actionLoading === `review-${reviewOrder.id}` ? 'Submitting...' : 'Submit Review'}
               </button>
             </div>

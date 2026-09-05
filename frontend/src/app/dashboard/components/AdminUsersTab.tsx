@@ -1,4 +1,5 @@
-import { RefreshCw, Users, Building, Clock } from 'lucide-react';
+import { Users, Building, Clock } from 'lucide-react';
+import { RefreshButton } from '@/components/ui/RefreshButton';
 
 interface AdminUsersTabProps {
   adminUsers: any[];
@@ -13,11 +14,7 @@ export default function AdminUsersTab({ adminUsers, fetchData }: AdminUsersTabPr
           <h1 className="text-2xl font-bold tracking-tight text-white">Platform Users</h1>
           <p className="text-xs text-slate-400">View and manage all registered users on the platform</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={fetchData} className="p-2.5 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all flex items-center justify-center">
-            <RefreshCw className="w-4 h-4 text-slate-300" />
-          </button>
-        </div>
+        <RefreshButton onRefresh={fetchData} />
       </div>
 
       <div className="space-y-4">

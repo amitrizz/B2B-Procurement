@@ -81,7 +81,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       else if (status === 'IN_TRANSIT') poStatus = 'IN_TRANSIT';
       else if (status === 'DELIVERED') poStatus = 'DELIVERED';
 
-      if (poStatus && devOrderDoc) {
+      if (poStatus && devOrderDoc?.purchaseOrderId) {
         await PurchaseOrder.updateOne(
           { _id: devOrderDoc.purchaseOrderId },
           { $set: { status: poStatus } },

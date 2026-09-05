@@ -10,6 +10,7 @@ export async function broadcastOrderUpdate(po: any, eventType: string, message: 
     // 1. Emit to Centrifugo
     await publishToCentrifugo('global_updates', {
       type: 'db_change',
+      eventType,
       targetCompanyIds: [po.buyerCompanyId?.toString(), po.supplierCompanyId?.toString()],
       message
     });

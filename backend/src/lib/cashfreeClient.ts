@@ -16,7 +16,7 @@ type CreateOrderInput = {
 export async function createCashfreeOrder(input: CreateOrderInput) {
   const cfg = getCashfreeConfig();
 
-  const returnUrl = `${cfg.frontendUrl}/dashboard/orders?payment=return&order_id={order_id}`;
+  const returnUrl = `${cfg.frontendUrl}/dashboard/orders?payment=return&order_id={order_id}&invoice_id=${encodeURIComponent(input.invoiceId)}`;
   const notifyUrl = `${cfg.backendUrl}/api/v1/payments/cashfree/webhook`;
 
   const response = await fetch(`${cfg.baseUrl}/orders`, {
@@ -89,11 +89,66 @@ export async function fetchCashfreeOrder(orderId: string) {
     throw new Error(message);
   }
 
-  return data as {
-    order_id: string;
-    order_status: string;
-    order_amount: number;
-    order_currency: string;
-    order_tags?: { invoice_id?: string };
-  };
+  return data as CashfreeOrderResponse;
+}
+
+export type CashfreeOrderResponse = {
+  order_id: string;
+  order_status: string;
+  order_amount: number;
+  order_currency: string;
+  order_tags?: Record<string, string> | { invoice_id?: string };
+  payments?: Array<{ payment_status?: string; status?: string }>;
+};
+
+export function resolveInvoiceIdFromCashfreeOrder(
+  cfOrder: CashfreeOrderResponse,
+  fallbackInvoiceId?: string
+): string | null {
+  const tags = cfOrder.order_tags;
+  if (tags && typeof tags === 'object') {
+    const fromTag = (tags as { invoice_id?: string }).invoice_id;
+    if (fromTag) return String(fromTag);
+  }
+  return fallbackInvoiceId || null;
+}
+
+export function isCashfreeOrderPaid(cfOrder: CashfreeOrderResponse): boolean {
+  const status = String(cfOrder.order_status || '').toUpperCase();
+  if (['PAID', 'SUCCESS'].includes(status)) return true;
+
+  const payments = cfOrder.payments;
+  if (Array.isArray(payments)) {
+    return payments.some((p) =>
+      ['SUCCESS', 'PAID', 'COMPLETED'].includes(
+        String(p.payment_status || p.status || '').toUpperCase()
+      )
+    );
+  }
+  return false;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Poll Cashfree until paid or terminal failure (handles redirect return lag). */
+export async function fetchCashfreeOrderUntilSettled(
+  orderId: string,
+  opts?: { attempts?: number; delayMs?: number }
+): Promise<CashfreeOrderResponse> {
+  const attempts = opts?.attempts ?? 6;
+  const delayMs = opts?.delayMs ?? 1500;
+  let last!: CashfreeOrderResponse;
+
+  for (let i = 0; i < attempts; i++) {
+    last = await fetchCashfreeOrder(orderId);
+    if (isCashfreeOrderPaid(last)) return last;
+
+    const status = String(last.order_status || '').toUpperCase();
+    if (['EXPIRED', 'CANCELLED', 'TERMINATED', 'FAILED'].includes(status)) {
+      return last;
+    }
+    if (i < attempts - 1) await sleep(delayMs);
+  }
+
+  return last;
 }

@@ -13,7 +13,11 @@ export const TransporterDocument = mongoose.models.TransporterDocument || mongoo
 // DeliveryOrder
 const DeliveryOrderSchema = new Schema({
   deliveryNumber: { type: String, required: true, unique: true },
-  purchaseOrderId: { type: Schema.Types.ObjectId, ref: 'PurchaseOrder', required: true, unique: true },
+  purpose: { type: String, default: 'PRODUCTION', enum: ['PRODUCTION', 'SAMPLE'] },
+  purchaseOrderId: { type: Schema.Types.ObjectId, ref: 'PurchaseOrder' },
+  samplingInviteId: { type: Schema.Types.ObjectId, ref: 'SamplingInvite' },
+  rfqId: { type: Schema.Types.ObjectId, ref: 'RFQ' },
+  assignedToPlatform: { type: Boolean, default: false },
   transporterId: { type: Schema.Types.ObjectId, ref: 'Transporter' },
   status: { type: String, default: 'CREATED' },
   deliveryCharge: { type: Number, default: 0 },
@@ -27,6 +31,22 @@ const DeliveryOrderSchema = new Schema({
   deliveryOtp: { type: String },
   deliveryOtpHash: { type: String }
 }, { timestamps: { createdAt: true, updatedAt: false } });
+
+// One production delivery per PO; one sample delivery per invite. Omit field when N/A (not null).
+DeliveryOrderSchema.index(
+  { purchaseOrderId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { purchaseOrderId: { $type: 'objectId' } },
+  }
+);
+DeliveryOrderSchema.index(
+  { samplingInviteId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { samplingInviteId: { $type: 'objectId' } },
+  }
+);
 
 export const DeliveryOrder = mongoose.models.DeliveryOrder || mongoose.model('DeliveryOrder', DeliveryOrderSchema);
 

@@ -41,7 +41,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
-    const allowedStatuses = ['CREATED', 'PROCESSING_20', 'PROCESSING_40', 'PROCESSING_60'];
+    const allowedStatuses = ['CREATED', 'ACCEPTED', 'PROCESSING_20', 'PROCESSING_40', 'PROCESSING_60'];
     if (!allowedStatuses.includes(order.status)) {
       return console.log(`[API Response] /api/v1/orders/[id]/start-processing - Sending response`), NextResponse.json(
         { success: false, code: 'INVALID_STATUS', message: 'Order cannot progress further using this action' },

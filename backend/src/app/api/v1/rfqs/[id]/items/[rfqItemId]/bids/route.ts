@@ -72,6 +72,16 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
+    if (
+      rfq.invitedSupplierCompanyId &&
+      rfq.invitedSupplierCompanyId.toString() !== user.companyId
+    ) {
+      return console.log(`[API Response] /api/v1/rfqs/[id]/items/[rfqItemId]/bids - Sending response`), NextResponse.json(
+        { success: false, code: 'NOT_INVITED', message: 'This repeat order RFQ is assigned to another supplier' },
+        { status: 403 }
+      );
+    }
+
     if (rfq.status !== 'PUBLISHED' || (rfq.bidEndAt && rfq.bidEndAt < new Date())) {
       return console.log(`[API Response] /api/v1/rfqs/[id]/items/[rfqItemId]/bids - Sending response`), NextResponse.json(
         { success: false, code: 'BIDDING_CLOSED', message: 'Bidding is closed for this requirement' },
