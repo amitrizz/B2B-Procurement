@@ -1,0 +1,269 @@
+@reference "../../app/globals.css";
+
+/* Styles for standard_catalog view */
+
+.standard_catalog--space-y-6-animate-in-fade-in {
+  @apply space-y-6 duration-700 ease-out;
+}
+
+.standard_catalog--flex-flex-col-smflex-row {
+  @apply flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4;
+}
+
+.standard_catalog--text-xl-font-bold-text-white {
+  @apply text-xl font-bold text-white flex items-center gap-2;
+}
+
+.standard_catalog--w-5-h-5-text-blue-400 {
+  @apply w-5 h-5 text-blue-400;
+}
+
+.standard_catalog--text-xs-text-slate-400-mt-1 {
+  @apply text-slate-400 mt-1;
+  font-size: var(--font-subtitle);
+}
+
+.standard_catalog--py-25-px-4-bg-blue-600 {
+  @apply py-2.5 px-4 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(37,99,235,0.2)] flex items-center gap-2;
+  background-color: var(--buyer-primary);
+  font-size: var(--font-subtitle);
+}
+
+.standard_catalog--w-4-h-4 {
+  @apply w-4 h-4;
+}
+
+.standard_catalog--grid-grid-cols-1-mdgrid-cols-2 {
+  @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4;
+}
+
+.standard_catalog--col-span-full-py-12-text-center {
+  @apply col-span-full py-12 text-center rounded-2xl border border-white/5;
+  color: var(--text-subtitle);
+  font-size: var(--font-normal);
+}
+
+.standard_catalog--glass-card-rounded-2xl-p-5 {
+  @apply rounded-2xl border border-white/5 flex flex-col justify-between hover:border-blue-500/30 transition-colors;
+  padding: var(--padding-card);
+}
+
+.standard_catalog--font-bold-text-base-text-white {
+  @apply font-bold text-base text-white;
+}
+
+.standard_catalog--text-xs-text-slate-400-mt-15 {
+  @apply text-slate-400 mt-1.5 line-clamp-2;
+  font-size: var(--font-subtitle);
+}
+
+.standard_catalog--mt-4-pt-3-border-t {
+  @apply mt-4 pt-3 border-t border-white/5 flex justify-between items-center text-[10px] text-slate-400;
+}
+
+.standard_catalog--text-white-font-semibold {
+  @apply text-white font-semibold;
+}
+
+.standard_catalog--flex-flex-col-smflex-row-1 {
+  @apply flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mt-12 pt-8 border-t border-white/10;
+}
+
+.standard_catalog--text-xl-font-bold-text-white-1 {
+  @apply text-xl font-bold text-white flex items-center gap-2;
+}
+
+.standard_catalog--w-5-h-5-text-blue-400-1 {
+  @apply w-5 h-5 text-blue-400;
+}
+
+.standard_catalog--text-xs-text-slate-400-mt-1-1 {
+  @apply text-slate-400 mt-1;
+  font-size: var(--font-subtitle);
+}
+
+.standard_catalog--py-25-px-4-bg-blue-600-1 {
+  @apply py-2.5 px-4 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(37,99,235,0.2)] flex items-center gap-2;
+  background-color: var(--buyer-primary);
+  font-size: var(--font-subtitle);
+}
+
+.standard_catalog--w-4-h-4-1 {
+  @apply w-4 h-4;
+}
+
+.standard_catalog--grid-grid-cols-1-mdgrid-cols-2-1 {
+  @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4;
+}
+
+.standard_catalog--col-span-full-py-12-text-center-1 {
+  @apply col-span-full py-12 text-center rounded-2xl border border-white/5;
+  color: var(--text-subtitle);
+  font-size: var(--font-normal);
+}
+
+.standard_catalog--glass-card-rounded-2xl-p-5-1 {
+  @apply rounded-2xl border border-white/5 flex flex-col justify-between hover:border-blue-500/30 transition-colors;
+  padding: var(--padding-card);
+}
+
+.standard_catalog--font-bold-text-base-text-white-1 {
+  @apply font-bold text-base text-white;
+}
+
+.standard_catalog--text-xs-text-slate-400-mt-15-1 {
+  @apply text-slate-400 mt-1.5 line-clamp-2;
+  font-size: var(--font-subtitle);
+}
+
+.standard_catalog--fixed-inset-0-bg-slate-95080 {
+  @apply fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50;
+}
+
+.standard_catalog--bg-slate-900-border-border-white10 {
+  @apply bg-slate-900 border border-white/10 rounded-2xl w-full max-w-md shadow-2xl;
+  padding: var(--padding-card);
+}
+
+.standard_catalog--text-lg-font-bold-text-white {
+  @apply font-bold text-white mb-4;
+  font-size: var(--font-title);
+}
+
+.standard_catalog--space-y-4 {
+  @apply space-y-4;
+}
+
+.standard_catalog--space-y-1 {
+  @apply space-y-1;
+}
+
+.standard_catalog--text-10px-text-slate-500-font-bold {
+  @apply text-[10px] font-bold uppercase tracking-wider block;
+  color: var(--text-subtitle);
+}
+
+.standard_catalog--text-red-500 {
+  @apply text-red-500;
+}
+
+.standard_catalog--w-full-bg-slate-950-border {
+  @apply w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-slate-200 focus:outline-none;
+  font-size: var(--font-normal);
+}
+
+.standard_catalog--space-y-1-1 {
+  @apply space-y-1;
+}
+
+.standard_catalog--text-10px-text-slate-500-font-bold-1 {
+  @apply text-[10px] font-bold uppercase tracking-wider block;
+  color: var(--text-subtitle);
+}
+
+.standard_catalog--w-full-h-24-bg-slate-950 {
+  @apply w-full h-24 bg-slate-950 border border-white/10 rounded-xl p-4 text-slate-200 focus:outline-none resize-none;
+  font-size: var(--font-normal);
+}
+
+.standard_catalog--space-y-1-2 {
+  @apply space-y-1;
+}
+
+.standard_catalog--text-10px-text-slate-500-font-bold-2 {
+  @apply text-[10px] font-bold uppercase tracking-wider block;
+  color: var(--text-subtitle);
+}
+
+.standard_catalog--w-full-bg-slate-950-border-1 {
+  @apply w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-slate-200 focus:outline-none;
+  font-size: var(--font-normal);
+}
+
+.standard_catalog--flex-justify-end-gap-3 {
+  @apply flex justify-end gap-3 pt-4 border-t border-white/5 mt-4;
+}
+
+.standard_catalog--px-5-py-2-text-slate-300 {
+  @apply px-5 py-2 text-slate-300 hover:text-white font-semibold;
+  font-size: var(--font-subtitle);
+}
+
+.standard_catalog--px-5-py-2-bg-blue-600 {
+  @apply px-5 py-2 hover:bg-blue-700 text-white rounded-xl font-semibold flex items-center justify-center min-w-[120px];
+  background-color: var(--buyer-primary);
+  font-size: var(--font-subtitle);
+}
+
+.standard_catalog--w-4-h-4-animate-spin {
+  @apply w-4 h-4 animate-spin;
+}
+
+.standard_catalog--fixed-inset-0-bg-slate-95080-1 {
+  @apply fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50;
+}
+
+.standard_catalog--bg-slate-900-border-border-white10-1 {
+  @apply bg-slate-900 border border-white/10 rounded-2xl w-full max-w-md shadow-2xl;
+  padding: var(--padding-card);
+}
+
+.standard_catalog--text-lg-font-bold-text-white-1 {
+  @apply font-bold text-white mb-4;
+  font-size: var(--font-title);
+}
+
+.standard_catalog--space-y-4-1 {
+  @apply space-y-4;
+}
+
+.standard_catalog--space-y-1-3 {
+  @apply space-y-1;
+}
+
+.standard_catalog--text-10px-text-slate-500-font-bold-3 {
+  @apply text-[10px] font-bold uppercase tracking-wider block;
+  color: var(--text-subtitle);
+}
+
+.standard_catalog--text-red-500-1 {
+  @apply text-red-500;
+}
+
+.standard_catalog--w-full-bg-slate-950-border-2 {
+  @apply w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-slate-200 focus:outline-none;
+  font-size: var(--font-normal);
+}
+
+.standard_catalog--space-y-1-4 {
+  @apply space-y-1;
+}
+
+.standard_catalog--text-10px-text-slate-500-font-bold-4 {
+  @apply text-[10px] font-bold uppercase tracking-wider block;
+  color: var(--text-subtitle);
+}
+
+.standard_catalog--w-full-h-24-bg-slate-950-1 {
+  @apply w-full h-24 bg-slate-950 border border-white/10 rounded-xl p-4 text-slate-200 focus:outline-none resize-none;
+  font-size: var(--font-normal);
+}
+
+.standard_catalog--flex-justify-end-gap-3-1 {
+  @apply flex justify-end gap-3 pt-4 border-t border-white/5 mt-4;
+}
+
+.standard_catalog--px-5-py-2-text-slate-300-1 {
+  @apply px-5 py-2 text-slate-300 hover:text-white font-semibold;
+  font-size: var(--font-subtitle);
+}
+
+.standard_catalog--px-5-py-2-bg-blue-600-1 {
+  @apply px-5 py-2 hover:bg-blue-700 text-white rounded-xl font-semibold flex items-center justify-center min-w-[120px];
+  background-color: var(--buyer-primary);
+  font-size: var(--font-subtitle);
+}
+
+.standard_catalog--w-4-h-4-animate-spin-1 {
+  @apply w-4 h-4 animate-spin;
+}

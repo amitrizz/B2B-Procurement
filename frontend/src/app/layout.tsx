@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Poppins } from "next/font/google";
 import "./globals.css";
 import CentrifugoProvider from "@/components/CentrifugoProvider";
 
-const inter = Inter({ subsets: ["latin"] });
+const poppins = Poppins({ 
+  subsets: ["latin"],
+  weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-poppins'
+});
 
 export const metadata: Metadata = {
   title: "B2B Procurement Marketplace",
@@ -31,7 +35,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="h-full dark bg-slate-950 text-slate-100">
-      <body className={`${inter.className} min-h-full flex flex-col`}>
+      <body className={`${poppins.variable} min-h-full flex flex-col`}>
         <CentrifugoProvider>
           {children}
         </CentrifugoProvider>

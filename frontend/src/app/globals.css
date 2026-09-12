@@ -1,13 +1,74 @@
 @import "tailwindcss";
 
 :root {
-  --background: #030712;
-  --foreground: #f3f4f6;
-  --card-bg: rgba(17, 24, 39, 0.7);
-  --card-border: rgba(255, 255, 255, 0.08);
+  /* Global Theme Variables */
+  --background: #f8fafc;
+  --foreground: #334155;
+  --card-bg: #ffffff;
+  --card-border: rgba(0, 29, 74, 0.08);
+
+  /* =========================================
+     COMMON VARIABLES (Used by both themes)
+     ========================================= */
+  --font-family-primary: var(--font-poppins), sans-serif;
+  --bg-color: #f8fafc;             /* Slate 50 */
+  --text-title: #001D4A;
+  --text-subtitle: #64748b;        /* Slate 500 */
+  --text-normal: #334155;          /* Slate 700 */
+  --card-bg-light: #ffffff;
+  --card-border-light: rgba(0, 29, 74, 0.08);
+  
+  --shadow-card: 0 4px 20px -10px rgba(0, 0, 0, 0.05);
+  --shadow-modal: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --padding-card: 1.5rem;          /* 24px */
+  --padding-modal: 2rem;           /* 32px */
+  
+  --font-header: 22px;
+  --font-title: 18px;
+  --font-subtitle: 13px;
+  --font-normal: 14px;
+  --font-modal-title: 20px;
+  --font-modal-text: 14px;
+  
+  --icon-size: 1.25rem;            /* 20px */
+
+  /* =========================================
+     BUYER THEME COLORS
+     ========================================= */
+  --buyer-primary: #3b82f6;        /* Blue 500 */
+  --buyer-secondary: #eff6ff;      /* Blue 50 */
+  --buyer-accent: #2563eb;         /* Blue 600 */
+
+  /* =========================================
+     SUPPLIER THEME COLORS
+     ========================================= */
+  --supplier-primary: #10b981;       /* Emerald 500 */
+  --supplier-secondary: #ecfdf5;     /* Emerald 50 */
+  --supplier-accent: #059669;        /* Emerald 600 */
+}
+
+/* =========================================
+   MOBILE RESPONSIVE OVERRIDES
+   Automatically scales variables on mobile
+   ========================================= */
+@media (max-width: 768px) {
+  :root {
+    --padding-card: 1rem;          /* 16px */
+    --padding-modal: 1.25rem;      /* 20px */
+    
+    --font-header: 20px;
+    --font-title: 16px;
+    --font-subtitle: 12px;
+    --font-normal: 13px;
+    --font-modal-title: 18px;
+    --font-modal-text: 13px;
+    
+    --icon-size: 1.125rem;         /* 18px */
+  }
 }
 
 body {
+  font-family: var(--font-family-primary);
   background-color: var(--background);
   color: var(--foreground);
   background-image: 
@@ -22,30 +83,31 @@ select {
 }
 
 select option {
-  background-color: #030712;
-  color: #f3f4f6;
+  background-color: var(--card-bg-light);
+  color: var(--text-title);
 }
 
 /* Glassmorphism utilities */
-.glass-panel {
-  background: var(--card-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--card-border);
-}
+@layer components {
+  .glass-panel {
+    background: var(--card-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--card-border);
+  }
 
-.glass-card {
-  background: rgba(31, 41, 55, 0.4);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
+  .glass-card {
+    background: var(--card-bg-light);
+    border: 1px solid var(--card-border-light);
+    box-shadow: var(--shadow-card);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
 
-.glass-card:hover {
-  border-color: rgba(59, 130, 246, 0.3);
-  box-shadow: 0 10px 30px -10px rgba(59, 130, 246, 0.2);
-  transform: translateY(-2px);
+  .glass-card:hover {
+    border-color: rgba(59, 130, 246, 0.3);
+    box-shadow: 0 10px 30px -10px rgba(59, 130, 246, 0.2);
+    transform: translateY(-2px);
+  }
 }
 
 /* Mobile Responsive Optimization Rules */
@@ -148,5 +210,12 @@ button:disabled:active {
   animation: spin360 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Hide Next.js dev indicator portal so it doesn't obstruct bottom navigation */
+nextjs-portal {
+  display: none !important;
+}
 
-
+/* Remove default mobile browser focus ring outlines */
+button:focus {
+  outline: none !important;
+}

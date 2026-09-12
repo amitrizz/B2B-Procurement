@@ -31,8 +31,8 @@ export async function POST(req: NextRequest) {
     const user = await getAuthUser(req);
     if (!user || !user.companyId) return authErrorResponse();
 
-    if (!['OWNER', 'PLATFORM_ADMIN'].includes(user.role)) {
-      return console.log(`[API Response] /api/v1/company/categories - Sending response`), NextResponse.json({ success: false, message: 'Only Owners can manage the category catalog' }, { status: 403 });
+    if (user.role && !['OWNER', 'PLATFORM_ADMIN', 'ADMIN', 'PROCUREMENT', 'BUYER'].includes(user.role)) {
+      return console.log(`[API Response] /api/v1/company/categories - Sending response`), NextResponse.json({ success: false, message: 'You do not have permission to manage the category catalog' }, { status: 403 });
     }
 
     const body = await req.json();

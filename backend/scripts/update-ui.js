@@ -1,4 +1,13 @@
-'use client';
+const fs = require('fs');
+const path = require('path');
+
+const targetPath = path.join(__dirname, 'frontend', 'src', 'app', 'page.tsx');
+
+let content = fs.readFileSync(targetPath, 'utf8');
+
+// I will overwrite the whole file, but I need to make sure I don't lose the functionality.
+
+const newContent = `'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -270,7 +279,7 @@ export default function Home() {
                     {/* Remember me & Forgot Password */}
                     <div className="flex justify-between items-center pt-2">
                        <label className="flex items-center gap-2 cursor-pointer">
-                         <div className={`w-4 h-4 rounded flex items-center justify-center transition-colors \${rememberMe ? 'bg-blue-600' : 'bg-gray-100 border border-gray-300'}`}>
+                         <div className={\`w-4 h-4 rounded flex items-center justify-center transition-colors \${rememberMe ? 'bg-blue-600' : 'bg-gray-100 border border-gray-300'}\`}>
                            {rememberMe && <Check className="w-3 h-3 text-white" />}
                            <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="sr-only" />
                          </div>
@@ -413,7 +422,7 @@ export default function Home() {
                </p>
              </div>
              {/* Decorative Building Illustration */}
-             <div className="w-20 h-20 bg-blue-100 rounded-2xl -mt-2 relative flex items-center justify-center overflow-hidden rotate-3 shadow-inner flex-shrink-0">
+             <div className="w-20 h-20 bg-blue-100 rounded-2xl -mt-2 relative flex items-center justify-center overflow-hidden rotate-3 shadow-inner">
                <Building className="w-10 h-10 text-blue-500 -rotate-3" />
                <div className="absolute bottom-0 left-0 w-full h-1/3 bg-gradient-to-t from-blue-200/50 to-transparent"></div>
              </div>
@@ -445,7 +454,7 @@ export default function Home() {
               {/* Email */}
               <div className="relative">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"><Mail className="w-5 h-5"/></div>
-                <input type="email" required value={email} onChange={(e)=>setEmail(e.target.value)} disabled={!!inviteToken} placeholder="you@company.com" className={`w-full bg-white border border-gray-200 rounded-xl py-3.5 pl-11 pr-4 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 transition-colors \${inviteToken ? 'opacity-60 bg-gray-50' : ''}`} />
+                <input type="email" required value={email} onChange={(e)=>setEmail(e.target.value)} disabled={!!inviteToken} placeholder="you@company.com" className={\`w-full bg-white border border-gray-200 rounded-xl py-3.5 pl-11 pr-4 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-blue-500 transition-colors \${inviteToken ? 'opacity-60 bg-gray-50' : ''}\`} />
                 <span className="absolute -top-2 left-3 bg-white px-1 text-[10px] text-gray-500 font-medium">Email Address</span>
               </div>
 
@@ -462,7 +471,7 @@ export default function Home() {
               {/* Terms checkbox */}
               <div className="pt-2">
                  <label className="flex items-start gap-3 cursor-pointer group">
-                   <div className={`w-4 h-4 mt-0.5 rounded border flex items-center justify-center flex-shrink-0 transition-colors \${agreeTerms ? 'bg-blue-600 border-blue-600' : 'bg-white border-gray-300'}`}>
+                   <div className={\`w-4 h-4 mt-0.5 rounded border flex items-center justify-center flex-shrink-0 transition-colors \${agreeTerms ? 'bg-blue-600 border-blue-600' : 'bg-white border-gray-300'}\`}>
                      {agreeTerms && <Check className="w-3 h-3 text-white" />}
                      <input type="checkbox" checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)} className="sr-only" />
                    </div>
@@ -491,3 +500,7 @@ export default function Home() {
     </Wrapper>
   );
 }
+`;
+
+fs.writeFileSync(targetPath, newContent);
+console.log('Done replacing content.');

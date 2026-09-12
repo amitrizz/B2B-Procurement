@@ -2,13 +2,13 @@
 export function getDefaultRouteForRole(role?: string | null): string {
   switch (role) {
     case 'PLATFORM_ADMIN':
-      return '/admin';
+      return '/dashboard/admin';
     case 'TRANSPORTER':
-      return '/delivery';
+      return '/dashboard/delivery';
     case 'FINANCE':
-      return '/orders';
+      return '/dashboard/orders';
     default:
-      return '/marketplace';
+      return '/dashboard/marketplace';
   }
 }
 
@@ -32,11 +32,30 @@ export function isTabAllowedForRole(tab: string, role?: string | null): boolean 
 }
 
 export function getRouteForTab(tab: string): string {
-  if (tab === 'my_rfqs') return '/rfqs';
-  if (tab === 'transporter') return '/delivery';
-  if (tab === 'marketplace') return '/marketplace';
-  if (tab === 'admin_users') return '/admin';
-  if (tab === 'company_chat') return '/chat';
-  if (tab !== 'marketplace') return `/${tab}`;
-  return '/marketplace';
+  if (tab === 'prs' || tab === 'requisitions') return '/dashboard/requisitions';
+  if (tab === 'my_rfqs') return '/dashboard/rfqs';
+  if (tab === 'transporter') return '/dashboard/delivery';
+  if (tab === 'marketplace') return '/dashboard/marketplace';
+  if (tab === 'admin_users') return '/dashboard/admin';
+  if (tab === 'company_chat') return '/dashboard/chat';
+  if (tab !== 'marketplace') return `/dashboard/${tab}`;
+  return '/dashboard/marketplace';
+}
+
+export type DashboardMode = 'buyer' | 'seller';
+
+/** Tabs that are strictly restricted to Buyer (Procure) mode */
+export const BUYER_ONLY_TABS = ['prs', 'requisitions'];
+
+/** Checks if a tab is allowed for the active dashboard mode */
+export function isTabAllowedForMode(tab: string, mode: DashboardMode): boolean {
+  if (mode === 'seller') {
+    return !BUYER_ONLY_TABS.includes(tab);
+  }
+  return true;
+}
+
+/** Route to redirect to when a tab is not allowed for the given mode */
+export function getDefaultRouteForMode(mode: DashboardMode): string {
+  return mode === 'seller' ? '/dashboard/rfqs' : '/dashboard/requisitions';
 }

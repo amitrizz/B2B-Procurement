@@ -51,12 +51,15 @@ export const CatalogItem = mongoose.models.CatalogItem || mongoose.model('Catalo
 const CompanyComponentSchema = new Schema({
   companyId: { type: Schema.Types.ObjectId, ref: 'Company', required: true },
   componentName: { type: String, required: true },
+  category: { type: String, default: 'General' },
+  categoryName: { type: String, default: 'General' },
   description: { type: String },
   defaultUnit: { type: String, default: 'pcs' }
 }, { timestamps: true });
 
-CompanyComponentSchema.index({ companyId: 1, componentName: 1 }, { unique: true });
-
+if (mongoose.models.CompanyComponent) {
+  delete (mongoose.models as any).CompanyComponent;
+}
 export const CompanyComponent = mongoose.models.CompanyComponent || mongoose.model('CompanyComponent', CompanyComponentSchema);
 
 // CompanyCategory

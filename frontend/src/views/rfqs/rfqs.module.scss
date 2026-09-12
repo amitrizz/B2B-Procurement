@@ -1,0 +1,529 @@
+@reference "../../app/globals.css";
+
+.rfq--container {
+  @apply space-y-5;
+}
+
+.rfq--header {
+  @apply flex justify-between items-start pt-2;
+}
+
+.rfq--title {
+  @apply font-bold tracking-tight;
+  font-size: var(--font-header);
+  color: var(--text-title);
+}
+
+.rfq--subtitle {
+  @apply mt-1.5 leading-relaxed;
+  font-size: var(--font-subtitle);
+  color: var(--text-subtitle);
+}
+
+.rfq--refresh-btn {
+  @apply shrink-0 rounded-full p-2.5;
+}
+
+.rfq--refresh-btn-buyer {
+  background-color: var(--buyer-secondary);
+  color: var(--buyer-primary);
+}
+
+.rfq--refresh-btn-seller {
+  background-color: var(--supplier-secondary);
+  color: var(--supplier-primary);
+}
+
+.rfq--tabs {
+  @apply flex p-1 rounded-xl bg-slate-100 max-w-full mt-2 border border-slate-200/50;
+}
+
+.rfq--tab-btn {
+  @apply flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all;
+}
+
+.rfq--tab-active-buyer {
+  @apply text-white shadow-xs;
+  background-color: var(--buyer-primary);
+}
+
+.rfq--tab-active-seller {
+  @apply bg-[#10b981] text-white shadow-xs;
+}
+
+.rfq--tab-inactive {
+  @apply hover:text-slate-700;
+  color: var(--text-subtitle);
+}
+
+.rfq--publish-btn {
+  @apply py-2 px-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all inline-flex items-center justify-center gap-1.5 shadow-xs active:scale-95 mt-1;
+}
+
+.rfq--card {
+  @apply bg-white rounded-3xl shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] flex flex-col space-y-3;
+  padding: var(--padding-card);
+}
+
+.rfq--card-header {
+  @apply flex justify-between items-center;
+}
+
+.rfq--status-pill {
+  @apply text-[10px] px-2.5 py-1 rounded-md font-bold uppercase tracking-wider;
+}
+
+.rfq--status-pill-buyer {
+  @apply text-blue-700;
+  background-color: var(--buyer-secondary);
+}
+
+.rfq--status-pill-seller {
+  @apply text-emerald-700;
+  background-color: var(--supplier-secondary);
+}
+
+.rfq--number {
+  @apply text-[11px] text-gray-400 font-bold;
+}
+
+.rfq--card-title {
+  @apply font-bold pt-1;
+  font-size: var(--font-title);
+  color: var(--text-title);
+}
+
+.rfq--urgent-badge {
+  @apply bg-[#EFF6FF] text-[#3B82F6] px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1;
+}
+
+.rfq--urgent-badge-seller {
+  @apply px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1;
+  background-color: var(--supplier-secondary);
+  color: var(--supplier-primary);
+}
+
+.rfq--properties-row {
+  @apply pt-3 space-y-1 text-[12px] font-medium;
+  color: var(--text-subtitle);
+}
+
+.rfq--actions-row {
+  @apply flex gap-2 pt-3;
+}
+
+.rfq--compare-btn {
+  @apply flex-1 py-3 bg-[#EFF6FF] text-[#2563EB] disabled:opacity-60 disabled:cursor-not-allowed rounded-2xl text-[12px] font-semibold flex items-center justify-between px-4 transition-all;
+}
+
+.rfq--edit-btn {
+  @apply py-3 px-5 bg-[#F8FAFC] text-[#334155] border border-slate-200 hover:bg-slate-100 rounded-2xl font-semibold flex items-center gap-2 transition-all;
+  font-size: var(--font-subtitle);
+}
+
+.rfq--dynamic-status {
+  @apply text-[10px] px-2.5 py-1 rounded-md font-bold uppercase tracking-wider;
+}
+
+.rfq--header-padding {
+  @apply pr-4;
+}
+
+.rfq--refresh-icon {
+  @apply w-5 h-5 cursor-pointer;
+}
+
+.rfq--publish-container {
+  @apply flex pt-1;
+}
+
+.rfq--plus-icon {
+  @apply w-3.5 h-3.5;
+}
+
+.rfq--details-card {
+  @apply bg-white rounded-2xl border border-gray-100 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] space-y-6;
+  padding: var(--padding-card);
+}
+
+.rfq--details-header {
+  @apply flex justify-between items-center border-b border-gray-100 pb-4;
+}
+
+.rfq--details-title {
+  @apply font-extrabold;
+  font-size: var(--font-title);
+  color: var(--text-title);
+}
+
+.rfq--details-number {
+  @apply text-[11px] font-bold;
+  color: var(--text-subtitle);
+}
+
+.rfq--back-button {
+  @apply px-3.5 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-600 rounded-xl font-bold transition-all border border-gray-200;
+  font-size: var(--font-subtitle);
+}
+
+.rfq--items-container {
+  @apply space-y-6;
+}
+
+.rfq--item-card {
+  @apply p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-4;
+}
+
+.rfq--item-header {
+  @apply flex justify-between items-start;
+}
+
+.rfq--item-name {
+  @apply font-bold;
+  font-size: var(--font-normal);
+  color: var(--text-title);
+}
+
+.rfq--item-meta {
+  @apply text-[11px] font-medium;
+  color: var(--text-subtitle);
+}
+
+.rfq--bids-container {
+  @apply space-y-2;
+}
+
+.rfq--bids-title {
+  @apply text-[10px] font-bold uppercase tracking-wider text-gray-400;
+}
+
+.rfq--table-wrapper {
+  @apply overflow-x-auto;
+}
+
+.rfq--table {
+  @apply w-full text-left border-collapse;
+  font-size: var(--font-subtitle);
+}
+
+.rfq--table-head-row {
+  @apply border-b border-gray-200;
+  color: var(--text-subtitle);
+}
+
+.rfq--th-supplier {
+  @apply pb-2 font-bold;
+}
+
+.rfq--th-price-material {
+  @apply pb-2 font-bold;
+}
+
+.rfq--th-price-no-material {
+  @apply pb-2 font-bold;
+}
+
+.rfq--th-delivery {
+  @apply pb-2 font-bold;
+}
+
+.rfq--th-action {
+  @apply pb-2 font-bold text-right;
+}
+
+.rfq--table-row {
+  @apply border-b border-gray-100;
+  color: var(--text-title);
+}
+
+.rfq--td-supplier {
+  @apply py-3 font-bold;
+}
+
+.rfq--td-price-mat {
+  @apply py-3 font-extrabold;
+  color: var(--buyer-primary);
+}
+
+.rfq--tax-label {
+  @apply text-[10px] font-medium block;
+  color: var(--text-subtitle);
+}
+
+.rfq--td-price-nomat {
+  @apply py-3 font-extrabold;
+  color: var(--buyer-primary);
+}
+
+.rfq--tax-label-nomat {
+  @apply text-[10px] font-medium block;
+  color: var(--text-subtitle);
+}
+
+.rfq--td-delivery {
+  @apply py-3 font-medium;
+}
+
+.rfq--td-action {
+  @apply py-3 text-right font-bold;
+  font-size: var(--font-subtitle);
+}
+
+.rfq--status-accepted {
+  @apply px-2.5 py-1.5 rounded-lg;
+  color: var(--supplier-primary);
+  background-color: var(--supplier-secondary);
+}
+
+.rfq--status-rejected {
+  @apply text-red-600 bg-red-50 px-2.5 py-1.5 rounded-lg;
+}
+
+.rfq--select-winner-btn {
+  @apply px-4 py-2 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg text-[11px] font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed border hover:border-emerald-600;
+  background-color: var(--supplier-secondary);
+  border-color: var(--supplier-secondary);
+}
+
+.rfq--no-quotes {
+  @apply font-medium;
+  font-size: var(--font-subtitle);
+  color: var(--text-subtitle);
+}
+
+.rfq--list-container {
+  @apply space-y-4;
+}
+
+.rfq--empty-state {
+  @apply py-12 text-center font-medium;
+  color: var(--text-subtitle);
+  font-size: var(--font-normal);
+}
+
+.rfq--urgent-icon-wrapper {
+  @apply flex items-center;
+}
+
+.rfq--urgent-icon {
+  @apply w-3 h-3;
+}
+
+.rfq--stats-row {
+  @apply flex gap-2;
+}
+
+.rfq--stat-value {
+  @apply font-bold;
+  color: var(--text-title);
+}
+
+.rfq--stats-group {
+  @apply flex gap-2;
+}
+
+.rfq--stat-value-blue {
+  @apply font-bold;
+  color: var(--text-title);
+}
+
+.rfq--stats-items {
+  @apply flex gap-2;
+}
+
+.rfq--stat-value-dark {
+  @apply font-bold;
+  color: var(--text-title);
+}
+
+.rfq--spinner {
+  @apply w-4 h-4 animate-spin mx-auto;
+}
+
+.rfq--btn-content {
+  @apply flex items-center gap-2;
+}
+
+.rfq--btn-icon {
+  @apply w-4 h-4;
+}
+
+.rfq--btn-icon-alt {
+  @apply w-4 h-4;
+}
+
+.rfq--btn-icon-dark {
+  @apply w-4 h-4;
+  color: var(--text-title);
+}
+
+.rfq--seller-bids {
+  @apply space-y-4;
+}
+
+.rfq--loading-state {
+  @apply py-12 text-center font-bold flex items-center justify-center gap-2;
+  color: var(--text-subtitle);
+  font-size: var(--font-normal);
+}
+
+.rfq--loading-spinner {
+  @apply w-4 h-4 animate-spin text-[#10b981];
+}
+
+.rfq--empty-bids {
+  @apply py-12 text-center font-medium;
+  color: var(--text-subtitle);
+  font-size: var(--font-normal);
+}
+
+.rfq--urgent-badge {
+  @apply flex items-center;
+}
+
+.rfq--urgent-badge-icon {
+  @apply w-3 h-3;
+}
+
+.rfq--bid-card-top {
+  @apply pt-2 text-[10px] uppercase tracking-wider font-extrabold text-blue-600/60;
+}
+
+.rfq--bid-card-title {
+  @apply capitalize font-bold mt-0.5;
+  color: var(--text-title);
+  font-size: var(--font-subtitle);
+}
+
+.rfq--bid-stats {
+  @apply flex gap-4 pt-3 border-t border-gray-100 mt-2;
+}
+
+.rfq--bid-stat-col {
+  @apply flex-1;
+}
+
+.rfq--bid-stat-label {
+  @apply text-[11px] font-medium;
+  color: var(--text-subtitle);
+}
+
+.rfq--bid-stat-value {
+  @apply text-[16px] font-extrabold pt-1;
+  color: var(--text-title);
+}
+
+.rfq--bid-stat-unit {
+  @apply text-[10px] text-gray-400 font-medium;
+}
+
+.rfq--divider {
+  @apply w-[1px] bg-gray-200;
+}
+
+.rfq--bid-stat-col-alt {
+  @apply flex-1;
+}
+
+.rfq--bid-stat-label-alt {
+  @apply text-[11px] font-medium;
+  color: var(--text-subtitle);
+}
+
+.rfq--bid-stat-value-alt {
+  @apply text-[16px] font-extrabold pt-1;
+  color: var(--text-title);
+}
+
+.rfq--bid-stat-sub {
+  @apply text-[9px] text-gray-400 font-medium leading-tight;
+}
+
+.rfq--bid-delivery {
+  @apply flex gap-2 pt-3 mt-1 items-center text-[12px];
+}
+
+.rfq--clock-icon {
+  @apply w-4 h-4;
+  color: var(--text-title);
+}
+
+.rfq--delivery-label {
+  @apply font-medium;
+  color: var(--text-subtitle);
+}
+
+.rfq--delivery-value {
+  @apply font-extrabold;
+  color: var(--text-title);
+}
+
+.rfq--bid-actions {
+  @apply pt-3;
+}
+
+.rfq--view-details-btn {
+  @apply w-full py-3 text-emerald-700 rounded-xl text-[12px] font-bold flex items-center justify-between px-4 transition-all border border-emerald-100;
+  background-color: var(--supplier-secondary);
+}
+
+.rfq--btn-inner {
+  @apply flex items-center gap-2;
+}
+
+.rfq--btn-inner-icon {
+  @apply w-4 h-4;
+}
+
+.rfq--btn-inner-icon-alt {
+  @apply w-4 h-4;
+}
+
+.rfq--modal-overlay {
+  @apply fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4;
+}
+
+.rfq--modal-content {
+  @apply relative max-w-sm w-full bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-2xl;
+  padding: var(--padding-card);
+}
+
+.rfq--modal-title {
+  @apply font-extrabold mb-4;
+  font-size: var(--font-title);
+  color: var(--text-title);
+}
+
+.rfq--modal-desc {
+  @apply mb-4;
+  font-size: var(--font-subtitle);
+  color: var(--text-subtitle);
+}
+
+.rfq--modal-form {
+  @apply space-y-4;
+}
+
+.rfq--modal-label {
+  @apply block text-[10px] font-extrabold uppercase text-gray-400 mb-1;
+}
+
+.rfq--modal-input {
+  @apply w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 font-bold focus:outline-none focus:border-emerald-500;
+  font-size: var(--font-normal);
+  color: var(--text-title);
+}
+
+.rfq--modal-help {
+  @apply text-[10px] font-medium block mt-1;
+  color: var(--text-subtitle);
+}
+
+.rfq--modal-submit {
+  @apply w-full py-3 bg-[#10b981] hover:bg-[#059669] disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl font-bold transition-all active:scale-95 shadow-md flex items-center justify-center gap-2;
+  font-size: var(--font-subtitle);
+}
+
+.rfq--modal-spinner {
+  @apply w-4 h-4 animate-spin;
+}

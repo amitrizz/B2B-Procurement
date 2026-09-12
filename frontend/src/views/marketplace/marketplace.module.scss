@@ -1,0 +1,405 @@
+@reference "../../app/globals.css";
+
+/* Styles for marketplace view */
+
+.marketplace--space-y-4 {
+  @apply space-y-4;
+}
+
+.marketplace--relative-pt-4-pb-12 {
+  @apply relative pt-4 pb-12 mb-4;
+}
+
+.marketplace--absolute-right-0-top-0 {
+  @apply absolute right-0 top-0 opacity-20 pointer-events-none;
+}
+
+.marketplace--relative-z-10-flex {
+  @apply relative z-10 flex justify-between items-start;
+}
+
+.marketplace--pr-12 {
+  @apply pr-12;
+}
+
+.marketplace--text-22px-font-extrabold-tracking-tight {
+  @apply font-extrabold tracking-tight;
+  font-size: var(--font-header);
+  color: var(--text-title);
+}
+
+.marketplace--text-13px-text-gray-500-mt-1 {
+  @apply mt-1 leading-relaxed max-w-[280px];
+  font-size: var(--font-subtitle);
+  color: var(--text-subtitle);
+}
+
+.marketplace--w-4-h-4-cursor-pointer {
+  @apply w-4 h-4 cursor-pointer;
+}
+
+.marketplace--bg-white-rounded-2xl-p-6 {
+  @apply bg-white rounded-2xl border border-gray-100 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] space-y-6;
+  padding: var(--padding-card);
+}
+
+.marketplace--flex-justify-between-items-center {
+  @apply flex justify-between items-center border-b border-gray-100 pb-4;
+}
+
+.marketplace--text-lg-font-bold-text-001D4A {
+  @apply font-bold;
+  font-size: var(--font-title);
+  color: var(--text-title);
+}
+
+.marketplace--px-35-py-15-bg-gray-50 {
+  @apply px-3.5 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-600 rounded-xl font-bold flex items-center gap-1.5 transition-all active:scale-95 border border-gray-200;
+  font-size: var(--font-subtitle);
+}
+
+.marketplace--w-35-h-35 {
+  @apply w-3.5 h-3.5;
+}
+
+.marketplace--p-4-bg-red-50-text-red-600 {
+  @apply p-4 bg-red-50 text-red-600 rounded-xl font-bold text-center border border-red-100;
+  font-size: var(--font-subtitle);
+}
+
+.marketplace--space-y-6 {
+  @apply space-y-6;
+}
+
+.marketplace--p-4-bg-F8FAFC-rounded-xl {
+  @apply p-4 bg-[#F8FAFC] rounded-xl border border-gray-200 grid md:grid-cols-2 gap-4;
+}
+
+.marketplace--font-bold-text-sm-text-blue-600 {
+  @apply font-bold;
+  font-size: var(--font-normal);
+  color: var(--buyer-primary);
+}
+
+.marketplace--text-xs-text-gray-500-mt-1 {
+  @apply mt-1 font-medium;
+  font-size: var(--font-subtitle);
+  color: var(--text-subtitle);
+}
+
+.marketplace--text-xs-text-gray-500-mt-05 {
+  @apply mt-0.5 font-medium;
+  font-size: var(--font-subtitle);
+  color: var(--text-subtitle);
+}
+
+.marketplace--font-bold-text-001D4A {
+  @apply font-bold;
+  color: var(--text-title);
+}
+
+.marketplace--text-10px-text-gray-500-mt-1 {
+  @apply text-[10px] mt-1 font-bold uppercase;
+  color: var(--text-subtitle);
+}
+
+.marketplace--text-10px-text-gray-500-mt-1-1 {
+  @apply text-[10px] mt-1 font-medium;
+  color: var(--text-subtitle);
+}
+
+.marketplace--underline-text-blue-600-font-bold {
+  @apply underline font-bold;
+  color: var(--buyer-primary);
+}
+
+.marketplace--space-y-4-1 {
+  @apply space-y-4;
+}
+
+.marketplace--space-y-1 {
+  @apply space-y-1;
+}
+
+.marketplace--text-10px-text-gray-500-font-bold {
+  @apply text-[10px] font-bold uppercase tracking-wider block;
+  color: var(--text-subtitle);
+}
+
+.marketplace--relative {
+  @apply relative;
+}
+
+.marketplace--absolute-left-35-top-12 {
+  @apply absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold;
+  font-size: var(--font-normal);
+}
+
+.marketplace--w-full-bg-white-border {
+  @apply w-full bg-white border border-gray-200 focus:border-blue-500 rounded-xl pl-8 pr-4 py-2.5 font-bold focus:outline-none transition-all placeholder:text-gray-400 placeholder:font-medium focus:ring-2 focus:ring-blue-500/20 shadow-sm;
+  font-size: var(--font-subtitle);
+  color: var(--text-title);
+}
+
+.marketplace--relative-1 {
+  @apply relative;
+}
+
+.marketplace--absolute-left-35-top-12-1 {
+  @apply absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold;
+  font-size: var(--font-normal);
+}
+
+.marketplace--w-full-bg-white-border-1 {
+  @apply w-full bg-white border border-gray-200 focus:border-blue-500 rounded-xl pl-8 pr-4 py-2.5 font-bold focus:outline-none transition-all placeholder:text-gray-400 placeholder:font-medium focus:ring-2 focus:ring-blue-500/20 shadow-sm;
+  font-size: var(--font-subtitle);
+  color: var(--text-title);
+}
+
+.marketplace--space-y-1-1 {
+  @apply space-y-1;
+}
+
+.marketplace--text-10px-text-gray-500-font-bold-1 {
+  @apply text-[10px] font-bold uppercase tracking-wider block;
+  color: var(--text-subtitle);
+}
+
+.marketplace--w-full-bg-white-border-2 {
+  @apply w-full bg-white border border-gray-200 focus:border-blue-500 rounded-xl px-3.5 py-2.5 font-bold focus:outline-none transition-all placeholder:text-gray-400 placeholder:font-medium focus:ring-2 focus:ring-blue-500/20 shadow-sm;
+  font-size: var(--font-subtitle);
+  color: var(--text-title);
+}
+
+.marketplace--flex-gap-2 {
+  @apply flex gap-2;
+}
+
+.marketplace--flex-1-bg-blue-600-hoverbg-blue-700 {
+  @apply flex-1 hover:bg-blue-700 text-white text-[11px] font-extrabold uppercase tracking-wider py-2.5 rounded-xl transition-all duration-300 transform active:scale-95 shadow-md flex items-center justify-center gap-2;
+  background-color: var(--buyer-primary);
+}
+
+.marketplace--w-4-h-4-animate-spin {
+  @apply w-4 h-4 animate-spin;
+}
+
+.marketplace--px-4-py-25-bg-red-50 {
+  @apply px-4 py-2.5 bg-red-50 border border-red-200 hover:bg-red-100 text-red-600 text-[11px] font-extrabold uppercase tracking-wider rounded-xl transition-all duration-300 transform active:scale-95 flex items-center justify-center min-w-[90px];
+}
+
+.marketplace--w-4-h-4-animate-spin-1 {
+  @apply w-4 h-4 animate-spin;
+}
+
+.marketplace--w-full-bg-389D7F-text-white {
+  @apply w-full bg-[#389D7F] text-white text-[12px] font-extrabold tracking-wider py-3 rounded-full transition-all duration-300 transform active:scale-95 shadow-md flex items-center justify-center gap-2;
+}
+
+.marketplace--w-4-h-4-animate-spin-2 {
+  @apply w-4 h-4 animate-spin;
+}
+
+.marketplace--grid-mdgrid-cols-2-lggrid-cols-3 {
+  @apply grid md:grid-cols-2 lg:grid-cols-3 gap-6;
+}
+
+.marketplace--col-span-full-py-12-text-center {
+  @apply col-span-full py-12 text-center font-medium;
+  color: var(--text-subtitle);
+  font-size: var(--font-normal);
+}
+
+.marketplace--bg-white-rounded-2xl-p-5 {
+  @apply bg-white rounded-2xl border border-gray-100 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] flex flex-col justify-between space-y-4;
+  padding: var(--padding-card);
+}
+
+.marketplace--flex-justify-between-items-start {
+  @apply flex justify-between items-start;
+}
+
+.marketplace--text-10px-text-gray-400-font-semibold {
+  @apply text-[10px] text-gray-400 font-semibold;
+}
+
+.marketplace--font-extrabold-text-17px-text-001D4A {
+  @apply font-extrabold text-[17px] mt-3;
+  color: var(--text-title);
+}
+
+.marketplace--text-13px-text-gray-500-mt-15 {
+  @apply mt-1.5 line-clamp-2 leading-relaxed;
+  font-size: var(--font-subtitle);
+  color: var(--text-subtitle);
+}
+
+.marketplace--mt-4-pt-4-border-t {
+  @apply mt-4 pt-4 border-t border-gray-100 space-y-2.5 text-[12px];
+  color: var(--text-subtitle);
+}
+
+.marketplace--flex-justify-between-items-center-1 {
+  @apply flex justify-between items-center;
+}
+
+.marketplace--flex-items-center-gap-2 {
+  @apply flex items-center gap-2;
+}
+
+.marketplace--w-4-h-4-text-001D4A {
+  @apply w-4 h-4;
+  color: var(--text-title);
+}
+
+.marketplace--font-bold-text-001D4A-1 {
+  @apply font-bold;
+  color: var(--text-title);
+}
+
+.marketplace--flex-justify-between-items-center-2 {
+  @apply flex justify-between items-center;
+}
+
+.marketplace--flex-items-center-gap-2-1 {
+  @apply flex items-center gap-2;
+}
+
+.marketplace--w-4-h-4-text-001D4A-1 {
+  @apply w-4 h-4;
+  color: var(--text-title);
+}
+
+.marketplace--font-bold-text-blue-600 {
+  @apply font-bold;
+  color: var(--buyer-primary);
+}
+
+.marketplace--flex-justify-between-items-center-3 {
+  @apply flex justify-between items-center;
+}
+
+.marketplace--flex-items-center-gap-2-2 {
+  @apply flex items-center gap-2;
+}
+
+.marketplace--w-4-h-4-text-001D4A-2 {
+  @apply w-4 h-4;
+  color: var(--text-title);
+}
+
+.marketplace--w-full-py-3-bg-blue-50 {
+  @apply w-full py-3 text-blue-700 rounded-full font-bold flex items-center justify-between px-6 transition-all active:scale-95 mt-2;
+  background-color: var(--buyer-secondary);
+  font-size: var(--font-subtitle);
+}
+
+.marketplace--flex-items-center-gap-2-3 {
+  @apply flex items-center gap-2;
+}
+
+.marketplace--w-4-h-4 {
+  @apply w-4 h-4;
+}
+
+.marketplace--w-4-h-4-1 {
+  @apply w-4 h-4;
+}
+
+.marketplace--w-full-py-3-bg-gray-100 {
+  @apply w-full py-3 bg-gray-100 rounded-full font-bold flex items-center justify-center gap-1.5 cursor-not-allowed mt-2;
+  color: var(--text-subtitle);
+  font-size: var(--font-subtitle);
+}
+
+.marketplace--w-full-py-3-bg-389D7F {
+  @apply w-full py-3 bg-[#389D7F] text-white rounded-full font-bold flex items-center justify-center gap-2 transition-all active:scale-95 mt-2;
+  font-size: var(--font-subtitle);
+}
+
+.marketplace--w-4-h-4-2 {
+  @apply w-4 h-4;
+}
+
+.marketplace--w-4-h-4-3 {
+  @apply w-4 h-4;
+}
+
+.marketplace--fixed-inset-0-z-60 {
+  @apply fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4;
+}
+
+.marketplace--bg-white-rounded-2xl-shadow-2xl {
+  @apply bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden relative;
+}
+
+.marketplace--p-4-border-b-border-gray-200 {
+  @apply p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50;
+}
+
+.marketplace--text-sm-font-bold-text-001D4A {
+  @apply font-bold flex items-center gap-2;
+  font-size: var(--font-normal);
+  color: var(--text-title);
+}
+
+.marketplace--p-15-hoverbg-gray-200-rounded-lg {
+  @apply p-1.5 hover:bg-gray-200 rounded-lg transition-colors;
+  color: var(--text-subtitle);
+}
+
+.marketplace--w-5-h-5 {
+  @apply w-5 h-5;
+}
+
+.marketplace--flex-1-bg-gray-100-p-4 {
+  @apply flex-1 bg-gray-100 p-4 overflow-hidden;
+}
+
+.marketplace--w-full-h-full-rounded-xl {
+  @apply w-full h-full rounded-xl border border-gray-200 bg-white shadow-sm;
+}
+
+.marketplace--fixed-inset-0-z-70 {
+  @apply fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4;
+}
+
+.marketplace--bg-white-rounded-2xl-shadow-2xl-1 {
+  @apply bg-white rounded-2xl shadow-2xl w-full max-w-lg relative;
+  padding: var(--padding-card);
+}
+
+.marketplace--text-lg-font-extrabold-text-001D4A {
+  @apply font-extrabold mb-4;
+  font-size: var(--font-title);
+  color: var(--text-title);
+}
+
+.marketplace--bg-gray-50-border-border-gray-200 {
+  @apply bg-gray-50 border border-gray-200 rounded-xl p-4 h-48 overflow-y-auto text-gray-600 mb-6 space-y-3;
+  font-size: var(--font-subtitle);
+}
+
+.marketplace--text-red-500-font-bold-mt-2 {
+  @apply text-red-500 font-bold mt-2;
+}
+
+.marketplace--flex-justify-end-gap-3 {
+  @apply flex justify-end gap-3;
+}
+
+.marketplace--px-5-py-25-text-sm {
+  @apply px-5 py-2.5 font-bold hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors;
+  font-size: var(--font-normal);
+  color: var(--text-subtitle);
+}
+
+.marketplace--px-5-py-25-bg-blue-600 {
+  @apply px-5 py-2.5 hover:bg-blue-700 text-white font-bold rounded-full transition-all flex items-center gap-2 active:scale-95;
+  background-color: var(--buyer-primary);
+  font-size: var(--font-normal);
+}
+
+.marketplace--w-4-h-4-animate-spin-3 {
+  @apply w-4 h-4 animate-spin;
+}

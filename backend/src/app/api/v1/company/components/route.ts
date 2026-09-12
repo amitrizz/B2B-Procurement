@@ -10,13 +10,15 @@ export async function GET(req: NextRequest) {
     await db();
     const { CompanyComponent } = await import('@/models/Catalog');
     
-    const components = await CompanyComponent.find({ companyId: user.companyId }).sort({ componentName: 1 });
+    const components = await CompanyComponent.find({ companyId: user.companyId }).sort({ componentName: 1 }).lean();
     
     return console.log(`[API Response] /api/v1/company/components - Sending response`), NextResponse.json({
       success: true,
       data: components.map((c: any) => ({
         id: c._id.toString(),
         componentName: c.componentName,
+        category: c.category || c.categoryName || 'General',
+        categoryName: c.categoryName || c.category || 'General',
         description: c.description,
         defaultUnit: c.defaultUnit
       }))
@@ -32,12 +34,12 @@ export async function POST(req: NextRequest) {
     const user = await getAuthUser(req);
     if (!user || !user.companyId) return authErrorResponse();
 
-    if (!['OWNER', 'PLATFORM_ADMIN'].includes(user.role)) {
-      return console.log(`[API Response] /api/v1/company/components - Sending response`), NextResponse.json({ success: false, message: 'Only Owners can manage the component catalog' }, { status: 403 });
+    if (user.role && !['OWNER', 'PLATFORM_ADMIN', 'ADMIN', 'PROCUREMENT', 'BUYER'].includes(user.role)) {
+      return console.log(`[API Response] /api/v1/company/components - Sending response`), NextResponse.json({ success: false, message: 'You do not have permission to manage the component catalog' }, { status: 403 });
     }
 
     const body = await req.json();
-    const { componentName, description, defaultUnit } = body;
+    const { componentName, category, categoryName, description, defaultUnit } = body;
 
     if (!componentName) {
       return console.log(`[API Response] /api/v1/company/components - Sending response`), NextResponse.json({ success: false, message: 'Component Name is required' }, { status: 400 });
@@ -56,12 +58,22 @@ export async function POST(req: NextRequest) {
       return console.log(`[API Response] /api/v1/company/components - Sending response`), NextResponse.json({ success: false, message: 'A component with this name already exists in your catalog' }, { status: 400 });
     }
 
+    const cat = (categoryName || category || 'General').trim();
+
     const component = await CompanyComponent.create({
       companyId: user.companyId,
       componentName,
+      category: cat,
+      categoryName: cat,
       description: description || '',
       defaultUnit: defaultUnit || 'pcs'
     });
+    
+    // Explicitly set category on collection to prevent any mongoose schema caching omissions
+    await CompanyComponent.collection.updateOne(
+      { _id: component._id },
+      { $set: { category: cat, categoryName: cat } }
+    );
     
     return console.log(`[API Response] /api/v1/company/components - Sending response`), NextResponse.json({
       success: true,
@@ -69,6 +81,8 @@ export async function POST(req: NextRequest) {
       data: {
         id: component._id.toString(),
         componentName: component.componentName,
+        category: component.category || cat,
+        categoryName: component.categoryName || cat,
         description: component.description,
         defaultUnit: component.defaultUnit
       }

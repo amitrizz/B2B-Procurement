@@ -1,0 +1,458 @@
+@reference "../../app/globals.css";
+
+/* Styles for admin view */
+
+.admin--space-y-6 {
+  @apply space-y-6;
+}
+
+.admin--flex-flex-col-smflex-row {
+  @apply flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4;
+}
+
+.admin--text-xl-font-bold-text-white {
+  @apply text-xl font-bold text-white;
+}
+
+.admin--text-xs-text-slate-400-mt-1 {
+  @apply text-slate-400 mt-1;
+  font-size: var(--font-subtitle);
+}
+
+.admin--flex-gap-2-shrink-0 {
+  @apply flex gap-2 shrink-0;
+}
+
+.admin--px-4-py-2-bg-blue-600 {
+  @apply px-4 py-2 hover:bg-blue-700 text-white rounded-xl font-bold transition-all;
+  background-color: var(--buyer-primary);
+  font-size: var(--font-subtitle);
+}
+
+.admin--grid-grid-cols-3-gap-15 {
+  @apply grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:gap-2 border-b border-white/10 pb-1;
+}
+
+.admin--w-3-h-3-smw-35 {
+  @apply w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0;
+}
+
+.admin--truncate-smhidden {
+  @apply truncate sm:hidden;
+}
+
+.admin--truncate-hidden-sminline {
+  @apply truncate hidden sm:inline;
+}
+
+.admin--space-y-4 {
+  @apply space-y-4;
+}
+
+.admin--text-sm-text-slate-500-py-8 {
+  @apply py-8 text-center;
+  font-size: var(--font-normal);
+  color: var(--text-subtitle);
+}
+
+.admin--flex-justify-between-items-center {
+  @apply flex justify-between items-center gap-3 flex-wrap;
+}
+
+.admin--font-bold-text-sm-text-slate-200 {
+  @apply font-bold text-slate-200 flex items-center gap-2 flex-wrap;
+  font-size: var(--font-normal);
+}
+
+.admin--px-2-py-05-bg-green-50010 {
+  @apply px-2 py-0.5 bg-green-500/10 text-green-400 border border-green-500/20 rounded-md text-[10px] font-bold;
+}
+
+.admin--px-2-py-05-bg-red-50010 {
+  @apply px-2 py-0.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded-md text-[10px] font-bold;
+}
+
+.admin--text-10px-text-slate-500-mt-1 {
+  @apply text-[10px] mt-1;
+  color: var(--text-subtitle);
+}
+
+.admin--font-semibold-text-blue-400 {
+  @apply font-semibold text-blue-400;
+}
+
+.admin--flex-gap-2 {
+  @apply flex gap-2;
+}
+
+.admin--w-3-h-3-animate-spin {
+  @apply w-3 h-3 animate-spin;
+}
+
+.admin--py-15-px-4-bg-green-600 {
+  @apply py-1.5 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold flex items-center gap-2 disabled:opacity-50;
+  font-size: var(--font-subtitle);
+}
+
+.admin--w-3-h-3-animate-spin-1 {
+  @apply w-3 h-3 animate-spin;
+}
+
+.admin--pt-4-border-t-border-white5 {
+  @apply pt-4 border-t border-white/5;
+}
+
+.admin--text-xs-font-bold-text-slate-300 {
+  @apply font-bold text-slate-300 mb-3 flex items-center gap-1;
+  font-size: var(--font-subtitle);
+}
+
+.admin--w-35-h-35 {
+  @apply w-3.5 h-3.5;
+}
+
+.admin--flex-flex-wrap-gap-3 {
+  @apply flex flex-wrap gap-3;
+}
+
+.admin--text-10px-flex-items-center {
+  @apply text-[10px] flex items-center gap-1 bg-slate-900/80 hover:bg-slate-800 border border-white/10 px-3 py-1.5 rounded-md text-blue-400 transition-colors;
+}
+
+.admin--w-3-h-3 {
+  @apply w-3 h-3;
+}
+
+.admin--text-10px-text-slate-500-italic {
+  @apply text-[10px] italic;
+  color: var(--text-subtitle);
+}
+
+.admin--space-y-4-1 {
+  @apply space-y-4;
+}
+
+.admin--py-8-text-center-text-slate-500 {
+  @apply py-8 text-center;
+  color: var(--text-subtitle);
+  font-size: var(--font-normal);
+}
+
+.admin--glass-card-rounded-2xl-p-5 {
+  @apply rounded-2xl border border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4;
+  padding: var(--padding-card);
+}
+
+.admin--flex-gap-2-items-center {
+  @apply flex gap-2 items-center flex-wrap;
+}
+
+.admin--text-10px-text-slate-500-font-semibold {
+  @apply text-[10px] font-semibold;
+  color: var(--text-subtitle);
+}
+
+.admin--text-10px-text-slate-500-font-semibold-1 {
+  @apply text-[10px] font-semibold;
+  color: var(--text-subtitle);
+}
+
+.admin--font-bold-text-sm-text-slate-200-1 {
+  @apply font-bold text-slate-200 mt-2;
+  font-size: var(--font-normal);
+}
+
+.admin--text-10px-text-green-400-mt-1 {
+  @apply text-[10px] text-green-400 mt-1;
+}
+
+.admin--text-10px-text-slate-400-mt-1 {
+  @apply text-[10px] text-slate-400 mt-1;
+}
+
+.admin--font-semibold-text-slate-300 {
+  @apply font-semibold text-slate-300;
+}
+
+.admin--font-semibold-text-slate-300-1 {
+  @apply font-semibold text-slate-300;
+}
+
+.admin--py-15-px-4-bg-green-600-1 {
+  @apply py-1.5 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold whitespace-nowrap flex items-center gap-2 disabled:opacity-50;
+  font-size: var(--font-subtitle);
+}
+
+.admin--w-3-h-3-animate-spin-2 {
+  @apply w-3 h-3 animate-spin;
+}
+
+.admin--space-y-3 {
+  @apply space-y-3;
+}
+
+.admin--py-8-text-center-text-slate-500-1 {
+  @apply py-8 text-center;
+  color: var(--text-subtitle);
+  font-size: var(--font-normal);
+}
+
+.admin--glass-card-rounded-xl-p-4 {
+  @apply rounded-xl p-4 border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3;
+}
+
+.admin--flex-items-center-gap-2 {
+  @apply flex items-center gap-2 flex-wrap;
+}
+
+.admin--text-sm-font-bold-text-white {
+  @apply font-bold text-white;
+  font-size: var(--font-normal);
+}
+
+.admin--text-10px-uppercase-px-2 {
+  @apply text-[10px] uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300;
+}
+
+.admin--text-10px-text-slate-400-mt-1-1 {
+  @apply text-[10px] text-slate-400 mt-1;
+}
+
+.admin--text-10px-text-slate-500-mt-05 {
+  @apply text-[10px] mt-0.5;
+  color: var(--text-subtitle);
+}
+
+.admin--flex-flex-col-items-end {
+  @apply flex flex-col items-end gap-2 shrink-0;
+}
+
+.admin--text-sm-font-bold-text-blue-400 {
+  @apply font-bold text-blue-400;
+  font-size: var(--font-normal);
+}
+
+.admin--text-10px-text-slate-500 {
+  @apply text-[10px];
+  color: var(--text-subtitle);
+}
+
+.admin--py-15-px-3-bg-blue-60020 {
+  @apply py-1.5 px-3 bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600 hover:text-white rounded-lg font-bold disabled:opacity-50 flex items-center gap-1.5;
+  font-size: var(--font-subtitle);
+}
+
+.admin--w-3-h-3-animate-spin-3 {
+  @apply w-3 h-3 animate-spin;
+}
+
+.admin--w-3-h-3-1 {
+  @apply w-3 h-3;
+}
+
+.admin--space-y-4-2 {
+  @apply space-y-4;
+}
+
+.admin--py-8-text-center-text-slate-500-2 {
+  @apply py-8 text-center;
+  color: var(--text-subtitle);
+  font-size: var(--font-normal);
+}
+
+.admin--glass-card-rounded-2xl-p-5-1 {
+  @apply rounded-2xl border border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4;
+  padding: var(--padding-card);
+}
+
+.admin--flex-items-start-gap-4 {
+  @apply flex items-start gap-4 w-full;
+}
+
+.admin--p-3-bg-blue-50010-rounded-full {
+  @apply p-3 bg-blue-500/10 rounded-full text-blue-400 shrink-0;
+}
+
+.admin--w-6-h-6 {
+  @apply w-6 h-6;
+}
+
+.admin--flex-1 {
+  @apply flex-1;
+}
+
+.admin--flex-items-center-gap-2-1 {
+  @apply flex items-center gap-2 mb-1 flex-wrap;
+}
+
+.admin--font-bold-text-sm-text-slate-200-2 {
+  @apply font-bold text-slate-200;
+  font-size: var(--font-normal);
+}
+
+.admin--text-10px-bg-slate-800-text-slate-300 {
+  @apply text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded uppercase tracking-wider font-semibold border border-slate-700;
+}
+
+.admin--grid-grid-cols-1-mdgrid-cols-2 {
+  @apply grid grid-cols-1 md:grid-cols-2 gap-y-1 gap-x-6 text-slate-400 mt-2;
+  font-size: var(--font-subtitle);
+}
+
+.admin--flex-items-center-gap-15 {
+  @apply flex items-center gap-1.5;
+}
+
+.admin--text-slate-500-font-semibold-w-16 {
+  @apply font-semibold w-16;
+  color: var(--text-subtitle);
+}
+
+.admin--text-slate-300-truncate {
+  @apply text-slate-300 truncate;
+}
+
+.admin--flex-items-center-gap-15-1 {
+  @apply flex items-center gap-1.5;
+}
+
+.admin--text-slate-500-font-semibold-w-16-1 {
+  @apply font-semibold w-16;
+  color: var(--text-subtitle);
+}
+
+.admin--flex-items-center-gap-1 {
+  @apply flex items-center gap-1 overflow-hidden;
+}
+
+.admin--w-3-h-3-shrink-0 {
+  @apply w-3 h-3 shrink-0;
+}
+
+.admin--text-slate-300-truncate-1 {
+  @apply text-slate-300 truncate;
+}
+
+.admin--flex-items-center-gap-15-2 {
+  @apply flex items-center gap-1.5;
+}
+
+.admin--text-slate-500-font-semibold-w-16-2 {
+  @apply font-semibold w-16;
+  color: var(--text-subtitle);
+}
+
+.admin--flex-items-center-gap-1-1 {
+  @apply flex items-center gap-1;
+}
+
+.admin--w-3-h-3-shrink-0-1 {
+  @apply w-3 h-3 shrink-0;
+}
+
+.admin--text-slate-300 {
+  @apply text-slate-300;
+}
+
+.admin--glass-card-rounded-2xl-p-5-2 {
+  @apply rounded-2xl border border-purple-500/20 space-y-3;
+  padding: var(--padding-card);
+}
+
+.admin--flex-justify-between-items-start {
+  @apply flex justify-between items-start gap-3 flex-wrap;
+}
+
+.admin--text-lg-font-bold-text-white {
+  @apply font-bold text-white flex items-center gap-2;
+  font-size: var(--font-title);
+}
+
+.admin--w-4-h-4-text-purple-400 {
+  @apply w-4 h-4 text-purple-400;
+}
+
+.admin--text-xs-text-slate-400-mt-1-1 {
+  @apply text-slate-400 mt-1;
+  font-size: var(--font-subtitle);
+}
+
+.admin--px-3-py-15-bg-purple-60020 {
+  @apply px-3 py-1.5 bg-purple-600/20 border border-purple-500/30 text-purple-300 rounded-lg font-bold whitespace-nowrap;
+  font-size: var(--font-subtitle);
+}
+
+.admin--text-sm-text-slate-500-py-4 {
+  @apply py-4 text-center;
+  font-size: var(--font-normal);
+  color: var(--text-subtitle);
+}
+
+.admin--space-y-2 {
+  @apply space-y-2;
+}
+
+.admin--p-3-bg-slate-90050-rounded-xl {
+  @apply p-3 bg-slate-900/50 rounded-xl border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-2;
+}
+
+.admin--text-sm-font-semibold-text-white {
+  @apply font-semibold text-white;
+  font-size: var(--font-normal);
+}
+
+.admin--text-10px-text-purple-300-uppercase {
+  @apply text-[10px] text-purple-300 uppercase;
+}
+
+.admin--text-10px-text-slate-400-mt-1-2 {
+  @apply text-[10px] text-slate-400 mt-1;
+}
+
+.admin--text-10px-text-slate-500-1 {
+  @apply text-[10px];
+  color: var(--text-subtitle);
+}
+
+.admin--py-15-px-3-bg-blue-600 {
+  @apply py-1.5 px-3 hover:bg-blue-700 text-white rounded-lg font-bold;
+  background-color: var(--buyer-primary);
+  font-size: var(--font-subtitle);
+}
+
+.admin--fixed-inset-0-z-50 {
+  @apply fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4;
+}
+
+.admin--bg-slate-900-border-border-white10 {
+  @apply bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden;
+}
+
+.admin--p-4-border-b-border-white10 {
+  @apply p-4 border-b border-white/10 flex justify-between items-center bg-slate-950/50;
+}
+
+.admin--text-sm-font-bold-text-white-1 {
+  @apply font-bold text-white flex items-center gap-2;
+  font-size: var(--font-normal);
+}
+
+.admin--w-4-h-4-text-blue-400 {
+  @apply w-4 h-4 text-blue-400;
+}
+
+.admin--p-15-hoverbg-white10-rounded-lg {
+  @apply p-1.5 hover:bg-white/10 rounded-lg transition-colors text-slate-400 hover:text-white;
+}
+
+.admin--w-5-h-5 {
+  @apply w-5 h-5;
+}
+
+.admin--flex-1-bg-slate-950-p-2 {
+  @apply flex-1 bg-slate-950 p-2 overflow-hidden;
+}
+
+.admin--w-full-h-full-rounded-xl {
+  @apply w-full h-full rounded-xl border border-white/5 bg-white;
+}
