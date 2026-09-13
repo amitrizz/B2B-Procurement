@@ -30,13 +30,25 @@ const NotificationSchema = new Schema({
 export const Notification = mongoose.models.Notification || mongoose.model('Notification', NotificationSchema);
 
 // User
+if (mongoose.models && mongoose.models.User) {
+  delete mongoose.models.User;
+}
+
 const UserSchema = new Schema({
   companyId: { type: Schema.Types.ObjectId, ref: 'Company' },
   email: { type: String, required: true, unique: true },
   name: { type: String },
   passwordHash: { type: String, required: true },
   role: { type: String, required: true },
-  emailVerified: { type: Boolean, default: false }
+  emailVerified: { type: Boolean, default: false },
+  lastOtp: {
+    code: { type: String },
+    type: { type: String },
+    generatedAt: { type: Date },
+    expiresAt: { type: Date },
+    isVerified: { type: Boolean, default: false },
+    verifiedAt: { type: Date }
+  }
 }, { timestamps: { createdAt: true, updatedAt: false }, collection: 'User' });
 
 export const User = mongoose.models.User || mongoose.model('User', UserSchema);

@@ -52,6 +52,17 @@ export async function POST(req: NextRequest) {
     // OTP is valid - delete it so it cannot be reused
     await AuthOtp.deleteOne({ _id: otpRecord._id });
 
+    // Mark lastOtp as verified on User
+    await User.updateOne(
+      { email: cleanEmail },
+      {
+        $set: {
+          'lastOtp.isVerified': true,
+          'lastOtp.verifiedAt': new Date()
+        }
+      }
+    );
+
     // Fetch user with company details
     const userDoc = await User.findOne({ email: cleanEmail }).populate('companyId').lean() as any;
     if (!userDoc) {

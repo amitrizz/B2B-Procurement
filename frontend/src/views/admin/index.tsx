@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   MessageSquare,
   UserCheck,
+  KeyRound,
 } from 'lucide-react';
 import AdminChatQaSection from '../chat/components/AdminChatQaSection';
 
@@ -536,6 +537,77 @@ export default function AdminTab({
                           <span className={styles['admin--text-slate-300']}>{new Date(u.createdAt).toLocaleDateString()}</span>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Latest OTP Block */}
+                    <div className="mt-3 p-2.5 sm:p-3 bg-slate-50 border border-slate-200/80 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-1.5 font-semibold text-slate-700">
+                          <KeyRound className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                          <span>Latest OTP:</span>
+                        </div>
+                        {u.latestOtp ? (
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-extrabold text-sm tracking-widest px-2.5 py-0.5 bg-white border border-blue-200 text-blue-700 rounded-md shadow-2xs select-all">
+                              {u.latestOtp.code}
+                            </span>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider border ${
+                                u.latestOtp.status === 'ACTIVE'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : u.latestOtp.status === 'VERIFIED'
+                                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                  : 'bg-rose-50 text-rose-700 border-rose-200'
+                              }`}
+                            >
+                              {u.latestOtp.status}
+                            </span>
+                            {u.latestOtp.type && (
+                              <span className="text-[10px] font-semibold text-slate-400">
+                                ({u.latestOtp.type})
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 italic text-[11px]">No OTP generated yet</span>
+                        )}
+                      </div>
+
+                      {u.latestOtp && (
+                        <div className="flex items-center gap-2 text-[11px] text-slate-500 flex-wrap">
+                          <span>
+                            Generated:{' '}
+                            <strong className="text-slate-700">
+                              {new Date(u.latestOtp.generatedAt).toLocaleString(undefined, {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit'
+                              })}
+                            </strong>
+                          </span>
+                          <span className="text-slate-300">·</span>
+                          <span>
+                            Expires:{' '}
+                            <strong
+                              className={
+                                u.latestOtp.status === 'EXPIRED'
+                                  ? 'text-rose-600'
+                                  : 'text-slate-700'
+                              }
+                            >
+                              {new Date(u.latestOtp.expiresAt).toLocaleString(undefined, {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit'
+                              })}
+                            </strong>
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   {u.company && (

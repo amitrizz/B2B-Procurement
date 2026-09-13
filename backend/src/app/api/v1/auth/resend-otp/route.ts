@@ -55,6 +55,22 @@ export async function POST(req: NextRequest) {
       { upsert: true, new: true }
     );
 
+    // Save latest OTP info to User model for admin visibility
+    await User.updateOne(
+      { email: cleanEmail },
+      {
+        $set: {
+          lastOtp: {
+            code: otp,
+            type: cleanType,
+            generatedAt: new Date(),
+            expiresAt,
+            isVerified: false
+          }
+        }
+      }
+    );
+
     // Prominently print to backend terminal console
     console.log('\n' + '='.repeat(54));
     console.log(`  🔄 [RESENT ${cleanType} OTP]`);

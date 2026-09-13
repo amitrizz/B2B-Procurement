@@ -7,6 +7,17 @@ import { getDefaultRouteForRole } from '@/lib/roleRouting';
 
 const REMEMBER_EMAIL_KEY = 'rememberedLoginEmail';
 
+// Wrapper for centering the mobile views on desktop - declared outside Home to prevent unmounting inputs on keystroke
+function Wrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen w-full flex justify-center items-center bg-gray-100">
+      <div className="w-full max-w-md h-screen md:h-auto md:min-h-[850px] shadow-2xl relative overflow-hidden bg-white md:rounded-[2.5rem]">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [authMode, setAuthMode] = useState<'login' | 'register' | 'forgot' | 'reset' | 'verify-login-otp' | 'verify-register-otp'>('login');
   const [loginMethod, setLoginMethod] = useState<'password' | 'otp'>('password');
@@ -297,15 +308,6 @@ export default function Home() {
       </div>
     );
   }
-
-  // Wrapper for centering the mobile views on desktop
-  const Wrapper = ({ children }: { children: React.ReactNode }) => (
-    <div className="min-h-screen w-full flex justify-center items-center bg-gray-100">
-      <div className="w-full max-w-md h-screen md:h-auto md:min-h-[850px] shadow-2xl relative overflow-hidden bg-white md:rounded-[2.5rem]">
-         {children}
-      </div>
-    </div>
-  );
 
   // OTP Verification View (for Login & Registration)
   if (authMode === 'verify-login-otp' || authMode === 'verify-register-otp') {

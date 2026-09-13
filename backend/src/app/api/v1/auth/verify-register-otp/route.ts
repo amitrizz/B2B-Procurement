@@ -71,7 +71,15 @@ export async function POST(req: NextRequest) {
         role: payload.role || 'MEMBER',
         companyId: payload.companyId,
         emailVerified: true,
-        name: payload.name
+        name: payload.name,
+        lastOtp: {
+          code: cleanOtp,
+          type: 'REGISTER',
+          generatedAt: otpRecord.createdAt || new Date(),
+          expiresAt: otpRecord.expiresAt,
+          isVerified: true,
+          verifiedAt: new Date()
+        }
       });
       userResult = { ...userDoc.toObject(), id: userDoc._id.toString() };
       
@@ -117,7 +125,15 @@ export async function POST(req: NextRequest) {
           role: userRole,
           companyId: company._id,
           emailVerified: true,
-          name: payload.name
+          name: payload.name,
+          lastOtp: {
+            code: cleanOtp,
+            type: 'REGISTER',
+            generatedAt: otpRecord.createdAt || new Date(),
+            expiresAt: otpRecord.expiresAt,
+            isVerified: true,
+            verifiedAt: new Date()
+          }
         }], { session });
         const user = userDocs[0];
 
