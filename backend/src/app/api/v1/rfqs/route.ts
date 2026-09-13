@@ -230,10 +230,77 @@ export async function POST(req: NextRequest) {
 
     if (rfq && rfq.status === 'PUBLISHED') {
       const { publishToCentrifugo } = await import('@/lib/centrifugo');
+      const { notifyCompany } = await import('@/lib/notify');
+      const { Company } = await import('@/models/Company');
+      const { Notification } = await import('@/models/User');
+
+      // 1. Notify the Buyer who published it
+      await notifyCompany(
+        user.companyId,
+        'RFQ Published',
+        `Your requirement "${rfq.title || rfq.rfqNumber}" has been published and is open for supplier bids.`,
+        'RFQ',
+        '/dashboard/my_rfqs',
+        { rfqId: rfq.id, rfqNumber: rfq.rfqNumber }
+      );
+
+      // 2. If specific supplier was invited directly, notify them
+      if (rfq.invitedSupplierCompanyId) {
+        await notifyCompany(
+          rfq.invitedSupplierCompanyId.toString(),
+          'Direct RFQ Invitation',
+          `You have been invited by a buyer to quote on RFQ ${rfq.rfqNumber}.`,
+          'RFQ',
+          '/dashboard/my_rfqs',
+          { rfqId: rfq.id, rfqNumber: rfq.rfqNumber }
+        );
+      }
+
+      // 3. Notify all other active companies / suppliers in the marketplace
+      const buyerName = user.company?.name || 'A buyer';
+      const marketTitle = 'New Requirement in Market';
+      const marketMessage = `${buyerName} posted "${rfq.title || rfq.rfqNumber}" in ${rfq.category || 'Marketplace'} — Submit your bid quote!`;
+
+      const mongooseObj = (await import('mongoose')).default;
+      const userCompId = user.companyId ? new mongooseObj.Types.ObjectId(user.companyId) : null;
+
+      const otherCompanies = (await Company.find({
+        ...(userCompId ? { _id: { $ne: userCompId } } : {})
+      }, '_id').limit(200).lean()) as any[];
+
+      const notifsToInsert = otherCompanies.map((c) => ({
+        companyId: c._id,
+        title: marketTitle,
+        message: marketMessage,
+        type: 'RFQ',
+        link: '/dashboard/marketplace',
+        read: false,
+        meta: { sourceId: rfq.id, rfqId: rfq.id, rfqNumber: rfq.rfqNumber }
+      }));
+
+      if (notifsToInsert.length > 0) {
+        await Notification.insertMany(notifsToInsert, { ordered: false }).catch(() => {});
+      }
+
+      // 4. Emit to Centrifugo global channel for other companies so they see the notification immediately
+      const targetCompanyIds = otherCompanies.map((c) => c._id.toString());
       await publishToCentrifugo('global_updates', {
         type: 'db_change',
-        target: 'all',
-        message: 'A new requirement has been posted in the marketplace!'
+        targetCompanyIds,
+        excludeCompanyId: user.companyId?.toString(),
+        senderCompanyId: user.companyId?.toString(),
+        eventType: 'marketplace_rfq_published',
+        message: marketMessage,
+        notification: {
+          id: `notif_${rfq.id}_${Date.now()}`,
+          title: marketTitle,
+          message: marketMessage,
+          type: 'RFQ',
+          link: '/dashboard/marketplace',
+          read: false,
+          createdAt: new Date().toISOString(),
+          meta: { sourceId: rfq.id, rfqNumber: rfq.rfqNumber }
+        }
       });
     }
 

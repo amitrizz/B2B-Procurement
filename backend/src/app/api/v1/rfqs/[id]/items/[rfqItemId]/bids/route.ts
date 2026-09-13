@@ -152,7 +152,9 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     if (bid) {
       const { broadcastCompanyUpdate } = await import('@/lib/companyEvents');
-      await broadcastCompanyUpdate(rfq.buyerCompanyId, 'bid_created', `A supplier submitted a new bid for RFQ ${rfq.rfqNumber}`);
+      const supplierName = user.company?.name || 'A supplier';
+      await broadcastCompanyUpdate(rfq.buyerCompanyId.toString(), 'bid_created', `${supplierName} submitted a new quote for RFQ ${rfq.rfqNumber}`);
+      await broadcastCompanyUpdate(user.companyId, 'bid_created', `Your quote was submitted for RFQ ${rfq.rfqNumber} (${bid.bidNumber})`);
     }
 
     return console.log(`[API Response] /api/v1/rfqs/[id]/items/[rfqItemId]/bids - Sending response`), NextResponse.json({

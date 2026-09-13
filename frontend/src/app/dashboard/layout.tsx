@@ -11,8 +11,9 @@ import {
   Building, LogOut, CheckCircle, Clock, ShoppingCart, Package,
   Plus, Users, FileText, ChevronRight, Truck, Info,
   Search, ShieldAlert, Star, RefreshCw, ArrowLeft,
-  Menu, X, User, Loader2, MessageSquare, Hexagon, Bell, ClipboardList
+  Menu, X, User, Loader2, MessageSquare, Hexagon, Bell, ClipboardList, UserCheck
 } from 'lucide-react';
+import { NotificationCenter, type NotificationItem } from '@/components/NotificationCenter';
 
 
 
@@ -25,6 +26,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [isImpersonating, setIsImpersonating] = useState(false);
+  const [impersonatedCompany, setImpersonatedCompany] = useState<any>(null);
 
   // Extract active tab state from path segments
   const pathParts = pathname.split('/').filter(Boolean);
@@ -101,6 +104,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [chatRealtimeEvent, setChatRealtimeEvent] = useState<any>(null);
 
+  // Dynamic Multi-Role Notifications State
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+
   const withLoading = async (actionId: string, fn: () => Promise<void>) => {
     setSubmittingActions(prev => ({ ...prev, [actionId]: true }));
     try {
@@ -141,16 +150,179 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }, 4000);
   };
 
+  const handleImpersonateCompany = async (company: any) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/v1/admin/impersonate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ companyId: company.id }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        showToast(data.message || 'Failed to impersonate company', 'error');
+        return;
+      }
+
+      // Save admin session backup before switching
+      localStorage.setItem('admin_backup_token', token || '');
+      localStorage.setItem('admin_backup_user', localStorage.getItem('user') || '');
+      localStorage.setItem('is_impersonating', 'true');
+      localStorage.setItem('impersonated_company', JSON.stringify(company));
+      localStorage.setItem('impersonated_target_email', data.data.user.email);
+
+      // Set impersonated credentials
+      localStorage.setItem('token', data.data.accessToken);
+      localStorage.setItem('user', JSON.stringify(data.data.user));
+      if (data.data.refreshToken) {
+        localStorage.setItem('refreshToken', data.data.refreshToken);
+      }
+
+      setUser(data.data.user);
+      setIsImpersonating(true);
+      setImpersonatedCompany(company);
+
+      showToast(`Now impersonating ${company.name}`, 'success');
+      router.push('/dashboard/marketplace');
+    } catch (err: any) {
+      showToast('Error starting impersonation', 'error');
+    }
+  };
+
+  const handleExitImpersonation = async () => {
+    try {
+      const targetEmail = localStorage.getItem('impersonated_target_email') || '';
+      if (targetEmail) {
+        await fetch('/api/v1/admin/impersonate/exit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetEmail }),
+        }).catch(() => {});
+      }
+
+      const backupToken = localStorage.getItem('admin_backup_token');
+      const backupUser = localStorage.getItem('admin_backup_user');
+
+      if (backupToken && backupUser) {
+        localStorage.setItem('token', backupToken);
+        localStorage.setItem('user', backupUser);
+        try {
+          setUser(JSON.parse(backupUser));
+        } catch {}
+      }
+
+      localStorage.removeItem('admin_backup_token');
+      localStorage.removeItem('admin_backup_user');
+      localStorage.removeItem('is_impersonating');
+      localStorage.removeItem('impersonated_company');
+      localStorage.removeItem('impersonated_target_email');
+
+      setIsImpersonating(false);
+      setImpersonatedCompany(null);
+
+      showToast('Exited impersonation. Returned to Platform Admin.', 'info');
+      router.push('/dashboard/admin');
+    } catch {
+      showToast('Error exiting impersonation', 'error');
+    }
+  };
+
+  const fetchNotifications = async (showLoading = false) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) return;
+    try {
+      if (showLoading && notifications.length === 0) {
+        setLoadingNotifications(true);
+      }
+      const res = await fetch('/api/v1/notifications', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        setNotifications(json.data.notifications || []);
+        setUnreadNotificationsCount(json.data.unreadCount || 0);
+      }
+    } catch (e) {
+      console.error('Failed to fetch notifications:', e);
+    } finally {
+      if (showLoading) {
+        setLoadingNotifications(false);
+      }
+    }
+  };
+
+  const handleMarkAllNotificationsRead = async () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) return;
+    try {
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      setUnreadNotificationsCount(0);
+      await fetch('/api/v1/notifications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ action: 'mark_all_read' })
+      });
+    } catch (e) {
+      console.error('Failed to mark all notifications read:', e);
+    }
+  };
+
+  const handleMarkNotificationRead = async (id: string) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) return;
+    try {
+      const target = notifications.find((n) => n.id === id);
+      const targetSourceId = target?.meta?.sourceId || target?.meta?.rfqId;
+
+      setNotifications((prev) =>
+        prev.map((n) => {
+          if (n.id === id || (targetSourceId && (n.meta?.sourceId === targetSourceId || n.meta?.rfqId === targetSourceId))) {
+            return { ...n, read: true };
+          }
+          return n;
+        })
+      );
+      setUnreadNotificationsCount((prev) => {
+        const newlyRead = notifications.filter(
+          (n) => !n.read && (n.id === id || (targetSourceId && (n.meta?.sourceId === targetSourceId || n.meta?.rfqId === targetSourceId)))
+        ).length;
+        return Math.max(0, prev - (newlyRead || 1));
+      });
+      await fetch('/api/v1/notifications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ action: 'mark_read', id })
+      });
+    } catch (e) {
+      console.error('Failed to mark notification read:', e);
+    }
+  };
+
   const fetchDataRef = useRef<(isBackground?: boolean) => Promise<void>>(null as any);
   const companyFetchSeqRef = useRef(0);
   /** After a live Centrifugo patch, ignore stale API responses briefly. */
   const companyRealtimePatchAtRef = useRef(0);
+  const lastCompanyRefreshRef = useRef(0);
 
-  /** Fetch latest company profile; ignores stale out-of-order responses. */
-  const refreshCompanyProfile = async (): Promise<void> => {
+  /** Fetch latest company profile; throttles duplicate calls within 60s unless forced. */
+  const refreshCompanyProfile = async (force = false): Promise<void> => {
     const token = localStorage.getItem('token');
     const stored = localStorage.getItem('user');
     if (!token || !stored) return;
+
+    if (!force && Date.now() - lastCompanyRefreshRef.current < 60000) {
+      return;
+    }
+    lastCompanyRefreshRef.current = Date.now();
 
     let parsed: any;
     try {
@@ -264,36 +436,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       const parsed = JSON.parse(storedUser);
       setUser(parsed);
       setModeState(readDashboardMode(getCompanyIdFromUser(parsed)));
-      setCheckingAuth(false);
-      const companyId = getCompanyIdFromUser(parsed);
-      if (companyId) {
-        const seq = ++companyFetchSeqRef.current;
-        fetch(`/api/v1/company/me?_t=${Date.now()}`, {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: 'no-store',
-        })
-          .then(async (res) => {
-            const raw = await res.text();
-            try {
-              return raw ? JSON.parse(raw) : null;
-            } catch {
-              console.error('Non-JSON response from /company/me:', raw.slice(0, 120));
-              return null;
-            }
-          })
-          .then(d => {
-            if (seq !== companyFetchSeqRef.current) return;
-            if (d?.success && d.data) {
-              setUser((prev: any) => {
-                const base = prev || parsed;
-                const updated = applyCompanyToUser(base, d.data);
-                persistUser(updated);
-                return updated;
-              });
-            }
-          })
-          .catch(err => console.error(err));
+
+      const impersonatingFlag = localStorage.getItem('is_impersonating') === 'true';
+      if (impersonatingFlag) {
+        setIsImpersonating(true);
+        try {
+          const comp = JSON.parse(localStorage.getItem('impersonated_company') || '{}');
+          setImpersonatedCompany(comp);
+        } catch {}
       }
+
+      setCheckingAuth(false);
   }, [router]);
 
   // Redirect legacy admin users route into unified admin portal
@@ -321,6 +474,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       fetchData();
     }
   }, [activeTab, mode, user?.id]);
+
+  // Initial fetch of notifications on session mount (reactive updates arrive via Centrifugo WebSocket)
+  useEffect(() => {
+    if (user?.id) {
+      fetchNotifications(false);
+    }
+  }, [user?.id]);
+
+  // Lazy-load PRs and company catalog components only when Create/Edit RFQ modal is actually opened
+  useEffect(() => {
+    if (showRfqModal) {
+      const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` };
+      if (prs.length === 0) {
+        fetch('/api/v1/prs', { headers }).then(r => r.json()).then(d => { if (d?.success) setPrs(d.data); }).catch(() => {});
+      }
+      if (companyComponents.length === 0) {
+        fetch('/api/v1/company/components', { headers }).then(r => r.json()).then(d => { if (d?.success) setCompanyComponents(d.data); }).catch(() => {});
+      }
+      if (companyCategories.length === 0) {
+        fetch('/api/v1/company/categories', { headers }).then(r => r.json()).then(d => { if (d?.success) setCompanyCategories(d.data); }).catch(() => {});
+      }
+    }
+  }, [showRfqModal]);
 
   useEffect(() => {
     if (activeTab === 'company_chat') {
@@ -363,9 +539,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           }
         }
       } else {
-        if (data?.message) {
+        const isExcludedCompany =
+          (data?.excludeCompanyId && data.excludeCompanyId === companyId) ||
+          (data?.senderCompanyId && data.senderCompanyId === companyId);
+
+        if (data?.message && !isExcludedCompany) {
           showToast(data.message, resolveToastType(data));
         }
+        if (data?.notification && !isExcludedCompany) {
+          setNotifications((prev) => {
+            const notifSrcId = data.notification.meta?.sourceId || data.notification.meta?.rfqId;
+            const alreadyExists = prev.some(
+              (n) =>
+                n.id === data.notification.id ||
+                (notifSrcId && (n.meta?.sourceId === notifSrcId || n.meta?.rfqId === notifSrcId))
+            );
+            if (alreadyExists) return prev;
+            return [data.notification, ...prev];
+          });
+          setUnreadNotificationsCount((c) => c + 1);
+        }
+        fetchNotifications(false);
         refreshCompanyProfile();
         if (fetchDataRef.current) fetchDataRef.current(true);
       }
@@ -400,11 +594,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     };
   }, [companyId, activeTab]);
 
+  const fetchAbortControllerRef = useRef<AbortController | null>(null);
+
   const fetchData = async (isBackground = false) => {
+    if (fetchAbortControllerRef.current) {
+      fetchAbortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    fetchAbortControllerRef.current = controller;
+
     if (!isBackground) setLoading(true);
     try {
       const headers = { 'Authorization': `Bearer ${localStorage.getItem('token')}` };
-      const fetchOpts: RequestInit = { headers, cache: 'no-store' };
+      const fetchOpts: RequestInit = { headers, cache: 'no-store', signal: controller.signal };
 
       await refreshCompanyProfile();
 
@@ -439,27 +641,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         const res = await fetch(`/api/v1/admin/companies?_t=${Date.now()}`, fetchOpts);
         const d = await res.json();
         if (d.success) setAdminCompanies(d.data);
-
-        const resPay = await fetch(`/api/v1/admin/payments?_t=${Date.now()}`, fetchOpts);
-        const dPay = await resPay.json();
-        if (dPay.success) {
-          setAdminPayments(dPay.data || []);
-        } else {
-          console.error('Admin payments fetch failed:', dPay.message);
-          setAdminPayments([]);
-        }
-
-        const resInv = await fetch(`/api/v1/admin/invoices?_t=${Date.now()}`, fetchOpts);
-        const dInv = await resInv.json();
-        if (dInv.success) setAdminInvoices(dInv.data || []);
-
-        const resUsers = await fetch(`/api/v1/admin/users?_t=${Date.now()}`, fetchOpts);
-        const dUsers = await resUsers.json();
-        if (dUsers.success) setAdminUsers(dUsers.data || []);
-
-        const resDel = await fetch(`/api/v1/transporter/deliveries?_t=${Date.now()}`, fetchOpts);
-        const dDel = await resDel.json();
-        if (dDel.success) setDeliveries(dDel.data);
       }
 
       if (activeTab === 'transporter') {
@@ -469,7 +650,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
 
       if (
-        (activeTab === 'prs' || activeTab === 'marketplace' || activeTab === 'my_rfqs') &&
+        activeTab === 'prs' &&
         role !== 'TRANSPORTER' &&
         role !== 'FINANCE'
       ) {
@@ -479,7 +660,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
 
       if (
-        (activeTab === 'prs' || activeTab === 'catalog' || activeTab === 'marketplace' || activeTab === 'my_rfqs') &&
+        (activeTab === 'catalog' || activeTab === 'components') &&
         role !== 'TRANSPORTER' &&
         role !== 'FINANCE'
       ) {
@@ -975,10 +1156,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2.5 shrink-0">
-            <button className="relative text-gray-500 p-1">
-               <Bell className="w-5 h-5" />
-               <span className="absolute top-0.5 right-0.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+          <div className="flex items-center gap-2 shrink-0">
+            {isImpersonating && (
+              <button
+                type="button"
+                onClick={handleExitImpersonation}
+                className="flex items-center gap-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-2 py-1 rounded-full text-[10px] font-extrabold shadow-sm transition-all cursor-pointer active:scale-95 shrink-0"
+                title={`Exit impersonation of ${impersonatedCompany?.name || user?.company?.name || 'Company'}`}
+              >
+                <UserCheck className="w-3.5 h-3.5 animate-pulse" />
+                <span>Exit</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setIsNotificationOpen(true);
+                if (notifications.length === 0) {
+                  fetchNotifications(true);
+                }
+              }}
+              className="relative p-1.5 text-slate-600 hover:text-[#001D4A] rounded-full transition-all cursor-pointer shrink-0"
+              title="Activity Notifications"
+            >
+              <Bell className="w-5 h-5" />
+              {unreadNotificationsCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-rose-600 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1 border-2 border-white shadow-sm animate-pulse">
+                  {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
+                </span>
+              )}
             </button>
             <button
               onClick={() => setMode(mode === 'buyer' ? 'seller' : 'buyer')}
@@ -1149,32 +1355,67 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="flex-1 flex flex-col overflow-y-auto bg-[#F8FAFC] md:bg-slate-950 px-5 pt-4 pb-24 md:p-10 min-h-0 relative">
         
         {/* Top Header Bar for Desktop */}
-        {activeTab !== 'admin' && (
         <div className="hidden md:flex justify-between items-center pb-6 border-b border-white/5 mb-6">
           <div>
             <h2 className="text-xl font-bold text-white">Dashboard Portal</h2>
             <p className="text-xs text-slate-400">Manage your requirements, quotes, and manufacturing milestones.</p>
           </div>
 
-          {/* Global Mode Switcher in Header */}
-          {user.role !== 'TRANSPORTER' && user.role !== 'PLATFORM_ADMIN' && (
-            <div className="bg-slate-900 border border-white/5 p-1 rounded-xl flex w-64">
-              <button
-                onClick={() => setMode('buyer')}
-                className={`flex-1 py-1.5 rounded-lg text-xs font-bold text-center transition-all ${mode === 'buyer' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-              >
-                Procure Mode
-              </button>
-              <button
-                onClick={() => setMode('seller')}
-                className={`flex-1 py-1.5 rounded-lg text-xs font-bold text-center transition-all ${mode === 'seller' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-              >
-                Supply Mode
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {isImpersonating && (
+              <div className="flex items-center gap-2 bg-purple-500/15 border border-purple-500/40 text-purple-200 px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs">
+                <UserCheck className="w-4 h-4 text-purple-300 animate-pulse" />
+                <span>Impersonating: <strong className="text-white">{impersonatedCompany?.name || user?.company?.name || 'Company'}</strong></span>
+                <button
+                  type="button"
+                  onClick={handleExitImpersonation}
+                  className="ml-2 px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-[10px] uppercase tracking-wider font-extrabold cursor-pointer transition-all shadow-2xs active:scale-95"
+                  title="Exit impersonation and return to Admin"
+                >
+                  Exit ✕
+                </button>
+              </div>
+            )}
+
+            {/* Global Mode Switcher in Header */}
+            {user.role !== 'TRANSPORTER' && user.role !== 'PLATFORM_ADMIN' && (
+              <div className="bg-slate-900 border border-white/5 p-1 rounded-xl flex w-64">
+                <button
+                  onClick={() => setMode('buyer')}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold text-center transition-all ${mode === 'buyer' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  Procure Mode
+                </button>
+                <button
+                  onClick={() => setMode('seller')}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold text-center transition-all ${mode === 'seller' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  Supply Mode
+                </button>
+              </div>
+            )}
+
+            {/* Desktop Notification Bell */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsNotificationOpen(true);
+                if (notifications.length === 0) {
+                  fetchNotifications(true);
+                }
+              }}
+              className="relative p-2 text-slate-300 hover:text-white bg-slate-900 border border-white/10 hover:border-white/20 rounded-xl transition-all cursor-pointer flex items-center justify-center shadow-xs shrink-0 hover:bg-white/5 active:scale-95"
+              title="Activity Notifications"
+            >
+              <Bell className="w-4 h-4 text-slate-300" />
+              {unreadNotificationsCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[19px] h-[19px] bg-rose-600 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1 border-2 border-slate-950 shadow-sm animate-pulse">
+                  {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
-        )}
 
         {msg.text && (
           <div className={`p-4 mb-6 rounded-xl border text-sm flex items-center justify-between ${msg.type === 'success' ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
@@ -1185,7 +1426,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         
         <DashboardContext.Provider value={{ 
-  marketplaceRfqs, selectedRfqForBidding, setSelectedRfqForBidding, bidInputs, setBidInputs, handleStartBidding, handleSubmitBid, handleWithdrawBid, fetchDataRef, mode, setMode, user, setUser, handleVerifyCompany, handleTabChange, setSelectedRfqForDetails, submittingActions, companyComponents, companyCategories, showToast, rfqs, selectedRfqForDetails, setShowRfqModal, handleEditRfq, handleSelectWinner, handleViewRfqDetails, orders, deliveries, adminCompanies, adminUsers, adminPayments, adminInvoices, refreshCompanyProfile, catalogItems, prs, chatRealtimeEvent, setPrs, setOrders, setDeliveries, setCatalogItems
+  marketplaceRfqs, selectedRfqForBidding, setSelectedRfqForBidding, bidInputs, setBidInputs, handleStartBidding, handleSubmitBid, handleWithdrawBid, fetchDataRef, mode, setMode, user, setUser, handleVerifyCompany, handleTabChange, setSelectedRfqForDetails, submittingActions, companyComponents, companyCategories, showToast, rfqs, selectedRfqForDetails, setShowRfqModal, handleEditRfq, handleSelectWinner, handleViewRfqDetails, orders, deliveries, adminCompanies, adminUsers, adminPayments, adminInvoices, refreshCompanyProfile, catalogItems, prs, chatRealtimeEvent, setPrs, setOrders, setDeliveries, setCatalogItems, handleImpersonateCompany, handleExitImpersonation, isImpersonating, impersonatedCompany
    }}>
           {children}
         </DashboardContext.Provider>
@@ -1474,7 +1715,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         ))}
       </div>
 
-
+      {/* Activity Notification Center */}
+      <NotificationCenter
+        isOpen={isNotificationOpen}
+        onClose={() => setIsNotificationOpen(false)}
+        notifications={notifications}
+        unreadCount={unreadNotificationsCount}
+        onMarkAllRead={handleMarkAllNotificationsRead}
+        onMarkRead={handleMarkNotificationRead}
+        onNavigate={(tab) => handleTabChange(tab)}
+        loading={loadingNotifications}
+      />
 
       <style jsx global>{`
         @keyframes toastSlideIn {

@@ -2,18 +2,45 @@ import { publishToCentrifugo } from './centrifugo';
 import { sendNotificationToUser } from './webpush';
 import { db } from './db';
 
-async function pushToCompanies(companyIds: string[], title: string, message: string, url = '/') {
+import mongoose from 'mongoose';
+
+async function pushToCompanies(companyIds: string[], title: string, message: string, url = '/dashboard/rfqs') {
   await db();
-  const { User } = await import('@/models/User');
+  const { User, Notification } = await import('@/models/User');
   const uniqueIds = [...new Set(companyIds.filter(Boolean))];
 
+  // 1. Persist notification in DB for each company
+  const notifs = uniqueIds
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => ({
+      companyId: new mongoose.Types.ObjectId(id),
+      title: 'Sampling Update',
+      message,
+      type: 'SAMPLING',
+      link: url,
+      read: false,
+      meta: { eventType: title }
+    }));
+
+  if (notifs.length > 0) {
+    await Notification.insertMany(notifs, { ordered: false }).catch(() => {});
+  }
+
+  // 2. Publish to Centrifugo
   await publishToCentrifugo('global_updates', {
     type: 'db_change',
     eventType: title,
     targetCompanyIds: uniqueIds,
     message,
+    notification: {
+      title: 'Sampling Update',
+      message,
+      type: 'SAMPLING',
+      link: url
+    }
   });
 
+  // 3. Send Web Push
   const users = (await User.find({ companyId: { $in: uniqueIds } }).lean()) as any[];
   await Promise.all(
     users.map((user) =>
@@ -21,7 +48,7 @@ async function pushToCompanies(companyIds: string[], title: string, message: str
         title: 'Sampling Update',
         body: message,
         url,
-      })
+      }).catch(() => {})
     )
   );
 }

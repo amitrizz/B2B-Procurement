@@ -116,6 +116,15 @@ export async function POST(req: NextRequest, { params }: Params) {
       session.endSession();
     }
 
+    if (purchaseOrder) {
+      const { broadcastOrderUpdate } = await import('@/lib/orderEvents');
+      await broadcastOrderUpdate(
+        purchaseOrder,
+        'delivery_status_updated',
+        `Shipment ${delivery.deliveryNumber} status changed to ${status.replace(/_/g, ' ')}.`
+      );
+    }
+
     return console.log(`[API Response] /api/v1/transporter/deliveries/[id]/status - Sending response`), NextResponse.json({
       success: true,
       message: 'Delivery status updated',

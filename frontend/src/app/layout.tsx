@@ -10,13 +10,18 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "B2B Procurement Marketplace",
-  description: "A premium component-level B2B procurement marketplace.",
+  title: "Kantech | B2B Procurement Platform",
+  description: "Kantech component-level B2B procurement platform.",
+  applicationName: "Kantech",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png"
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "B2B Procure"
+    title: "Kantech"
   }
 };
 

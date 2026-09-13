@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { FlaskConical, CheckCircle, Truck, X, Clock, Loader2 } from 'lucide-react';
+import { FlaskConical, CheckCircle, Truck, X, Clock, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { onCentrifugoEvent } from '@/lib/centrifugoClient';
 
 function defaultDeadlineValue() {
@@ -210,53 +210,55 @@ export default function SamplingPanel({
   const canEvaluate = isActiveCampaign && ['DELIVERED', 'EVALUATION'].includes(campaign.status);
 
   return (
-    <div className="p-4 bg-purple-500/5 border border-purple-500/20 rounded-xl space-y-4">
+    <div className="p-4 bg-purple-50/80 border border-purple-200/80 rounded-2xl space-y-4 shadow-2xs">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <FlaskConical className="w-4 h-4 text-purple-400" />
-          <h5 className="text-sm font-bold text-purple-300">Physical Sampling</h5>
+        <div className="flex items-center gap-2.5">
+          <div className="p-1.5 bg-purple-100 text-purple-700 rounded-lg border border-purple-200">
+            <FlaskConical className="w-4 h-4" />
+          </div>
+          <h5 className="text-sm font-bold text-slate-900">Physical Sampling</h5>
         </div>
         {campaign && isActiveCampaign && campaign.status !== 'AWARDED' && campaign.status !== 'CANCELLED' && (
           <button
             onClick={cancelSampling}
             disabled={actionLoading === 'cancel'}
-            className="text-[10px] text-red-400 hover:text-red-300 disabled:opacity-50 flex items-center gap-1"
+            className="text-xs text-red-600 hover:text-red-700 font-semibold disabled:opacity-50 flex items-center gap-1 cursor-pointer"
           >
             {actionLoading === 'cancel' && <Loader2 className="w-3 h-3 animate-spin" />}
-            Cancel
+            Cancel Campaign
           </button>
         )}
       </div>
 
       {!isActiveCampaign && (
         <>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-xs text-slate-600 leading-relaxed">
             Invite up to 5 suppliers to prepare physical samples. A transporter will pick up and deliver samples to you
             — no photos required from suppliers.
           </p>
           {canStart && (
             <button
               onClick={() => setShowStartModal(true)}
-              className="px-4 py-2 bg-purple-600/20 border border-purple-500/30 text-purple-300 rounded-lg text-xs font-bold hover:bg-purple-600/30"
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
             >
               Start Sampling
             </button>
           )}
           {!hasBids && (
-            <p className="text-[11px] text-slate-500 italic">Waiting for supplier bids before sampling can start.</p>
+            <p className="text-xs text-slate-500 italic">Waiting for supplier bids before sampling can start.</p>
           )}
         </>
       )}
 
       {isActiveCampaign && (
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-3 text-[11px]">
-            <span className="text-slate-500">
-              Status: <span className="font-bold text-purple-300">{campaign.status}</span>
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            <span className="text-slate-600 font-medium">
+              Status: <span className="font-bold text-purple-800 bg-purple-100 px-2 py-0.5 rounded border border-purple-200">{campaign.status}</span>
             </span>
             {campaign.sampleDeadlineAt && (
-              <span className="flex items-center gap-1 text-amber-400">
-                <Clock className="w-3 h-3" />
+              <span className="flex items-center gap-1 font-medium text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                <Clock className="w-3.5 h-3.5 text-amber-600" />
                 Deadline: {formatDeadline(campaign.sampleDeadlineAt)}
               </span>
             )}
@@ -265,28 +267,28 @@ export default function SamplingPanel({
             {(campaign.invites || []).map((inv: any) => (
               <div
                 key={inv.id}
-                className="p-3 bg-slate-900/40 rounded-lg border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                className="p-3.5 bg-white rounded-xl border border-purple-100 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3"
               >
-                <div>
-                  <p className="text-sm font-semibold text-white">{inv.supplierName}</p>
-                  <p className="text-[10px] text-slate-500">Status: {inv.status}</p>
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-slate-900">{inv.supplierName}</p>
+                  <p className="text-xs text-slate-500 font-medium">Status: <span className="font-semibold text-purple-700">{inv.status}</span></p>
                   {isSamplePickedUp(inv.delivery) && !isSampleDelivered(inv.delivery) && (
-                    <p className="text-[10px] text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg px-2 py-1 mt-1 inline-block">
+                    <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1 mt-1 inline-block font-medium">
                       {inv.supplierName} sample picked up — in transit to you.
                     </p>
                   )}
                   {isSampleDelivered(inv.delivery) && (
-                    <p className="text-[10px] text-green-300 bg-green-500/10 border border-green-500/20 rounded-lg px-2 py-1 mt-1 inline-block">
+                    <p className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1 mt-1 inline-block font-medium">
                       {inv.supplierName} sample delivered — ready for evaluation.
                     </p>
                   )}
                   {inv.submission?.notes && (
-                    <p className="text-[11px] text-slate-400 mt-1">{inv.submission.notes}</p>
+                    <p className="text-xs text-slate-600 mt-1 bg-slate-50 p-2 rounded border border-slate-200">{inv.submission.notes}</p>
                   )}
                   {inv.delivery && (
-                    <div className="mt-2 space-y-1">
-                      <p className="text-[10px] text-blue-400 flex items-center gap-1">
-                        <Truck className="w-3 h-3" /> {inv.delivery.deliveryNumber} — {inv.delivery.status}
+                    <div className="mt-2 space-y-1.5">
+                      <p className="text-xs text-blue-700 font-medium flex items-center gap-1">
+                        <Truck className="w-3.5 h-3.5" /> {inv.delivery.deliveryNumber} — {inv.delivery.status}
                         {inv.delivery.transporterName
                           ? ` · ${inv.delivery.transporterName}`
                           : inv.delivery.status === 'CREATED'
@@ -294,9 +296,9 @@ export default function SamplingPanel({
                             : ''}
                       </p>
                       {inv.delivery.deliveryOtp && (
-                        <p className="text-[10px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-2 py-1 inline-block">
-                          Delivery OTP: <span className="font-bold tracking-widest">{inv.delivery.deliveryOtp}</span>
-                          <span className="block text-emerald-400/80 font-normal mt-0.5">
+                        <p className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1 inline-block">
+                          Delivery OTP: <span className="font-mono font-bold tracking-widest text-emerald-900 bg-white px-2 py-0.5 rounded border border-emerald-300">{inv.delivery.deliveryOtp}</span>
+                          <span className="block text-emerald-700 text-[11px] font-normal mt-0.5">
                             Share with transporter when sample arrives.
                           </span>
                         </p>
@@ -304,19 +306,19 @@ export default function SamplingPanel({
                     </div>
                   )}
                   {inv.status === 'SUBMITTED' && !inv.delivery && (
-                    <p className="text-[10px] text-amber-400 mt-1">Scheduling pickup job… refresh in a moment.</p>
+                    <p className="text-xs text-amber-700 mt-1">Scheduling pickup job… refresh in a moment.</p>
                   )}
                 </div>
                 {canEvaluate && (inv.status === 'DELIVERED' || isSampleDelivered(inv.delivery)) && (
                   <button
                     onClick={() => selectWinner(inv.id)}
                     disabled={actionLoading === `winner-${inv.id}`}
-                    className="px-3 py-1.5 bg-green-600/20 border border-green-500/30 text-green-400 rounded-lg text-[10px] font-bold flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-600 rounded-xl text-xs font-bold flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed shadow-xs transition-all cursor-pointer"
                   >
                     {actionLoading === `winner-${inv.id}` ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     ) : (
-                      <CheckCircle className="w-3 h-3" />
+                      <CheckCircle className="w-3.5 h-3.5" />
                     )}
                     {actionLoading === `winner-${inv.id}` ? 'Selecting...' : 'Select Winner'}
                   </button>
@@ -325,7 +327,7 @@ export default function SamplingPanel({
             ))}
           </div>
           {canEvaluate && (
-            <p className="text-[10px] text-slate-500">
+            <p className="text-xs text-slate-500">
               Review physical samples offline after delivery, then select the winning supplier.
             </p>
           )}
@@ -334,23 +336,23 @@ export default function SamplingPanel({
 
       {showStartModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
           onClick={() => setShowStartModal(false)}
         >
           <div
-            className="max-w-md w-full bg-slate-900 border border-white/10 rounded-2xl p-6 space-y-4"
+            className="max-w-md w-full bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center">
-              <h3 className="font-bold text-white">Select suppliers for sampling</h3>
-              <button onClick={() => setShowStartModal(false)}>
-                <X className="w-4 h-4 text-slate-400" />
+              <h3 className="font-bold text-slate-900 text-base">Select suppliers for sampling</h3>
+              <button onClick={() => setShowStartModal(false)} className="p-1 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer">
+                <X className="w-4 h-4 text-slate-500" />
               </button>
             </div>
-            <p className="text-xs text-slate-400">RFQ {rfqNumber} — max 5 companies</p>
+            <p className="text-xs text-slate-500">RFQ {rfqNumber} — max 5 companies</p>
 
             <div>
-              <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">
+              <label className="block text-xs font-bold text-slate-700 mb-1">
                 Sample ready deadline
               </label>
               <input
@@ -358,25 +360,25 @@ export default function SamplingPanel({
                 value={sampleDeadlineAt}
                 min={defaultDeadlineValue().slice(0, 16)}
                 onChange={(e) => setSampleDeadlineAt(e.target.value)}
-                className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-sm text-slate-200"
+                className="w-full bg-white border border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none transition-all shadow-2xs"
               />
-              <p className="text-[10px] text-slate-500 mt-1">
+              <p className="text-[11px] text-slate-500 mt-1">
                 Suppliers must have samples ready for platform pickup by this date.
               </p>
             </div>
 
-            <div className="space-y-2 max-h-48 overflow-y-auto">
+            <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
               {bidders.map((b) => {
                 const selected = b.bidIds.every((id) => selectedBidIds.includes(id));
                 return (
                   <label
                     key={b.supplierId}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer ${
-                      selected ? 'border-purple-500/50 bg-purple-500/10' : 'border-white/5'
+                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                      selected ? 'border-purple-500 bg-purple-50/60 text-purple-900 font-semibold' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    <input type="checkbox" checked={selected} onChange={() => toggleBidSelection(b.bidIds)} />
-                    <span className="text-sm text-slate-200">{b.supplierName}</span>
+                    <input type="checkbox" checked={selected} onChange={() => toggleBidSelection(b.bidIds)} className="accent-purple-600 rounded" />
+                    <span className="text-sm">{b.supplierName}</span>
                   </label>
                 );
               })}
@@ -384,7 +386,7 @@ export default function SamplingPanel({
             <button
               onClick={startSampling}
               disabled={actionLoading === 'start'}
-              className="w-full py-2.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2"
+              className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 active:scale-98 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
             >
               {actionLoading === 'start' && <Loader2 className="w-4 h-4 animate-spin" />}
               {actionLoading === 'start' ? 'Starting...' : 'Start Sampling'}
@@ -482,92 +484,167 @@ export function SupplierSamplingPanel({
   if (active.length === 0) return null;
 
   return (
-    <div className="glass-card rounded-2xl p-5 border border-purple-500/20 space-y-4 mb-6">
-      <div className="flex items-center gap-2">
-        <FlaskConical className="w-5 h-5 text-purple-400" />
-        <h2 className="text-lg font-bold text-white">Sample Requests</h2>
+    <div className="bg-gradient-to-br from-purple-50/70 via-white to-purple-50/40 rounded-2xl p-4 sm:p-5 border border-purple-200/80 shadow-[0_2px_12px_-4px_rgba(147,51,234,0.08)] space-y-4 mb-6 transition-all">
+      <div className="flex items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 bg-purple-100/80 text-purple-700 rounded-xl border border-purple-200/60 shadow-xs flex items-center justify-center">
+            <FlaskConical className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-bold text-slate-900 tracking-tight">Physical Sample Requests</h2>
+              <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-[11px] font-bold rounded-full border border-purple-200/60">
+                {active.length} active
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Prepare your physical sample. A transporter will pick it up and deliver to the buyer — no photo upload needed.
+            </p>
+          </div>
+        </div>
       </div>
-      <p className="text-[11px] text-slate-400">
-        Prepare your physical sample. A transporter will pick it up and deliver to the buyer — no photo upload needed.
-      </p>
+
       <div className="space-y-3">
         {active.map((inv) => {
           const pastDeadline =
             inv.sampleDeadlineAt && new Date(inv.sampleDeadlineAt).getTime() < Date.now();
+          const isExpanded = expandedId === inv.id;
+
           return (
-            <div key={inv.id} className="p-4 bg-slate-900/40 rounded-xl border border-white/5">
-              <p className="font-semibold text-white">{inv.rfqTitle}</p>
-              <p className="text-[10px] text-slate-500">
-                {inv.rfqNumber} — {inv.status}
-              </p>
+            <div
+              key={inv.id}
+              className="bg-white rounded-xl p-4 border border-purple-100/90 shadow-xs hover:border-purple-200 hover:shadow-sm transition-all space-y-3"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="font-bold text-slate-900 text-sm">{inv.rfqTitle || 'RFQ Requirement'}</h4>
+                    <span className="text-[11px] font-bold text-slate-300">·</span>
+                    <span className="text-xs font-semibold text-slate-500">{inv.rfqNumber}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider border ${
+                      inv.status === 'SUBMITTED'
+                        ? 'bg-blue-50 text-blue-700 border-blue-200'
+                        : inv.status === 'READY_FOR_PICKUP'
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                        : 'bg-purple-50 text-purple-700 border-purple-200'
+                    }`}
+                  >
+                    {inv.status?.replace(/_/g, ' ')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Status Badges & Alerts */}
               {isSamplePickedUp(inv.delivery) && !isSampleDelivered(inv.delivery) && (
-                <p className="text-[10px] text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg px-2 py-1 mt-1 inline-block">
-                  Sample picked up — on the way to buyer.
-                </p>
+                <div className="flex items-center gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200/80 rounded-lg px-3 py-2 font-medium">
+                  <Truck className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Sample picked up by transporter — currently in transit to the buyer.</span>
+                </div>
               )}
+
               {isSampleDelivered(inv.delivery) && (
-                <p className="text-[10px] text-green-300 bg-green-500/10 border border-green-500/20 rounded-lg px-2 py-1 mt-1 inline-block">
-                  Sample delivered to buyer.
-                </p>
+                <div className="flex items-center gap-2 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200/80 rounded-lg px-3 py-2 font-medium">
+                  <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Sample delivered to buyer — waiting for buyer evaluation.</span>
+                </div>
               )}
+
               {inv.sampleDeadlineAt && (
-                <p
-                  className={`text-[10px] mt-1 flex items-center gap-1 ${
-                    pastDeadline ? 'text-red-400' : 'text-amber-400'
+                <div
+                  className={`text-xs flex items-center gap-1.5 font-medium ${
+                    pastDeadline ? 'text-red-600' : 'text-slate-600'
                   }`}
                 >
-                  <Clock className="w-3 h-3" />
-                  Ready by: {formatDeadline(inv.sampleDeadlineAt)}
-                  {pastDeadline ? ' (deadline passed)' : ''}
-                </p>
-              )}
-              {inv.delivery && (
-                <div className="mt-2 space-y-1">
-                  <p className="text-[10px] text-blue-400 flex items-center gap-1">
-                    <Truck className="w-3 h-3" />
-                    {inv.delivery.deliveryNumber} — {inv.delivery.status}
-                  </p>
-                  {inv.delivery.pickupOtp && ['CREATED', 'ACCEPTED'].includes(inv.delivery.status) && (
-                    <p className="text-[10px] text-purple-300 bg-purple-500/10 border border-purple-500/20 rounded-lg px-2 py-1 inline-block">
-                      Pickup OTP: <span className="font-bold tracking-widest">{inv.delivery.pickupOtp}</span>
-                      <span className="block text-purple-400/80 font-normal mt-0.5">
-                        Share with transporter at pickup.
-                      </span>
-                    </p>
+                  <Clock className={`w-3.5 h-3.5 ${pastDeadline ? 'text-red-500' : 'text-slate-400'}`} />
+                  <span>Ready by:</span>
+                  <span className={`font-semibold ${pastDeadline ? 'text-red-600' : 'text-slate-900'}`}>
+                    {formatDeadline(inv.sampleDeadlineAt)}
+                  </span>
+                  {pastDeadline && (
+                    <span className="text-[11px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded border border-red-200">
+                      Deadline passed
+                    </span>
                   )}
                 </div>
               )}
+
+              {/* Delivery Details & Pickup OTP */}
+              {inv.delivery && (
+                <div className="p-3 bg-slate-50/80 rounded-lg border border-slate-200/70 text-xs space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1.5 font-semibold text-slate-800">
+                      <Truck className="w-3.5 h-3.5 text-blue-600" />
+                      Shipment {inv.delivery.deliveryNumber}
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                      {inv.delivery.status}
+                    </span>
+                  </div>
+
+                  {inv.delivery.pickupOtp && ['CREATED', 'ACCEPTED'].includes(inv.delivery.status) && (
+                    <div className="p-2.5 bg-purple-50/80 border border-purple-200 rounded-lg flex items-center justify-between gap-3 flex-wrap">
+                      <div>
+                        <span className="text-xs font-semibold text-purple-900">Pickup OTP:</span>
+                        <p className="text-[10px] text-purple-700">Share this code with the transporter driver upon pickup</p>
+                      </div>
+                      <span className="font-mono font-extrabold tracking-widest text-purple-900 text-sm bg-white px-3 py-1 rounded-md border border-purple-300 shadow-2xs">
+                        {inv.delivery.pickupOtp}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Action Area */}
               {['INVITED', 'PREPARING'].includes(inv.status) && !pastDeadline && (
-                <>
+                <div className="pt-1">
                   <button
-                    onClick={() => setExpandedId(expandedId === inv.id ? null : inv.id)}
-                    className="mt-2 text-xs text-purple-400 font-bold"
+                    type="button"
+                    onClick={() => setExpandedId(isExpanded ? null : inv.id)}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-700 hover:text-purple-800 bg-purple-100/70 hover:bg-purple-100 border border-purple-200/80 px-3.5 py-2 rounded-xl transition-all cursor-pointer shadow-2xs active:scale-98"
                   >
-                    Confirm Sample Ready
+                    <FlaskConical className="w-3.5 h-3.5 text-purple-600" />
+                    <span>{isExpanded ? 'Cancel' : 'Confirm Sample Ready'}</span>
+                    {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                   </button>
-                  {expandedId === inv.id && (
-                    <div className="mt-3 space-y-2">
-                      <textarea
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        placeholder="Optional notes for pickup (location, contact, etc.)"
-                        className="w-full bg-slate-950 border border-white/10 rounded-lg p-2 text-xs text-slate-200"
-                        rows={3}
-                      />
+
+                  {isExpanded && (
+                    <div className="mt-3 p-3.5 bg-purple-50/40 rounded-xl border border-purple-200/70 space-y-3 animate-in fade-in duration-150">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Pickup Notes & Instructions <span className="text-slate-400 font-normal">(Optional)</span>
+                        </label>
+                        <textarea
+                          value={notes}
+                          onChange={(e) => setNotes(e.target.value)}
+                          placeholder="Provide pickup location, contact person phone number, warehouse timing, or package details..."
+                          className="w-full bg-white border border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 rounded-lg p-2.5 text-xs text-slate-800 placeholder-slate-400 outline-none transition-all shadow-2xs"
+                          rows={3}
+                        />
+                      </div>
                       <button
+                        type="button"
                         onClick={() => confirmReadyForPickup(inv.rfqId, inv.id)}
                         disabled={actionLoading === inv.id}
-                        className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold flex items-center gap-2"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 active:scale-98 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
                       >
                         {actionLoading === inv.id && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                        {actionLoading === inv.id ? 'Submitting...' : 'Sample Ready — Request Transporter Pickup'}
+                        <span>{actionLoading === inv.id ? 'Submitting...' : 'Sample Ready — Request Transporter Pickup'}</span>
                       </button>
                     </div>
                   )}
-                </>
+                </div>
               )}
+
               {inv.status === 'SUBMITTED' && !inv.delivery && (
-                <p className="text-[10px] text-slate-500 mt-2">Scheduling transporter pickup…</p>
+                <div className="flex items-center gap-2 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600" />
+                  <span>Scheduling transporter pickup with the logistics network...</span>
+                </div>
               )}
             </div>
           );

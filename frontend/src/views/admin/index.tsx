@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import styles from './admin.module.scss';
 import InvoiceDetailModal from '@/components/InvoiceDetailModal';
 import { RefreshButton } from '@/components/ui/RefreshButton';
@@ -14,6 +14,7 @@ import {
   Receipt,
   ShieldCheck,
   MessageSquare,
+  UserCheck,
 } from 'lucide-react';
 import AdminChatQaSection from '../chat/components/AdminChatQaSection';
 
@@ -41,6 +42,7 @@ interface AdminTabProps {
   sampleDeliveries?: any[];
   fetchData: () => Promise<void>;
   handleVerifyCompany: (companyId: string) => Promise<void>;
+  handleImpersonateCompany?: (company: any) => Promise<void>;
   onOpenDeliveryPortal?: () => void;
 }
 
@@ -55,15 +57,74 @@ export default function AdminTab({
   sampleDeliveries = [],
   fetchData,
   handleVerifyCompany,
+  handleImpersonateCompany,
   onOpenDeliveryPortal,
 }: AdminTabProps) {
   const [section, setSection] = useState<AdminSection>('verification');
+  const [internalPayments, setInternalPayments] = useState<any[] | null>(null);
+  const [internalUsers, setInternalUsers] = useState<any[] | null>(null);
+  const [internalInvoices, setInternalInvoices] = useState<any[] | null>(null);
+  const [internalDeliveries, setInternalDeliveries] = useState<any[] | null>(null);
+  const [loadingSection, setLoadingSection] = useState(false);
+
+  const payments = internalPayments !== null ? internalPayments : (adminPayments || []);
+  const users = internalUsers !== null ? internalUsers : (adminUsers || []);
+  const invoices = internalInvoices !== null ? internalInvoices : (adminInvoices || []);
+  const deliveries = internalDeliveries !== null ? internalDeliveries : (sampleDeliveries || []);
+
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) return;
+    const headers = { Authorization: `Bearer ${token}` };
+
+    if (section === 'escrow' && internalPayments === null && (!adminPayments || adminPayments.length === 0)) {
+      setLoadingSection(true);
+      fetch(`/api/v1/admin/payments?_t=${Date.now()}`, { headers })
+        .then(r => r.json())
+        .then(d => { if (d.success) setInternalPayments(d.data || []); })
+        .catch(() => {})
+        .finally(() => setLoadingSection(false));
+    } else if (section === 'invoices' && internalInvoices === null && (!adminInvoices || adminInvoices.length === 0)) {
+      setLoadingSection(true);
+      fetch(`/api/v1/admin/invoices?_t=${Date.now()}`, { headers })
+        .then(r => r.json())
+        .then(d => { if (d.success) setInternalInvoices(d.data || []); })
+        .catch(() => {})
+        .finally(() => setLoadingSection(false));
+    } else if (section === 'users' && internalUsers === null && (!adminUsers || adminUsers.length === 0)) {
+      setLoadingSection(true);
+      fetch(`/api/v1/admin/users?_t=${Date.now()}`, { headers })
+        .then(r => r.json())
+        .then(d => { if (d.success) setInternalUsers(d.data || []); })
+        .catch(() => {})
+        .finally(() => setLoadingSection(false));
+    } else if (section === 'samples' && internalDeliveries === null && (!sampleDeliveries || sampleDeliveries.length === 0)) {
+      setLoadingSection(true);
+      fetch(`/api/v1/transporter/deliveries?_t=${Date.now()}`, { headers })
+        .then(r => r.json())
+        .then(d => { if (d.success) setInternalDeliveries(d.data || []); })
+        .catch(() => {})
+        .finally(() => setLoadingSection(false));
+    }
+  }, [section]);
+
   const [selectedDoc, setSelectedDoc] = useState<{ url: string; name: string } | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
+  const [impersonatingId, setImpersonatingId] = useState<string | null>(null);
   const [releasingId, setReleasingId] = useState<string | null>(null);
   const [viewInvoice, setViewInvoice] = useState<any | null>(null);
   const [loadingInvoiceId, setLoadingInvoiceId] = useState<string | null>(null);
+
+  const handleImpersonate = async (company: any) => {
+    if (!handleImpersonateCompany) return;
+    setImpersonatingId(company.id);
+    try {
+      await handleImpersonateCompany(company);
+    } finally {
+      setImpersonatingId(null);
+    }
+  };
 
   const openInvoiceView = async (invoiceId: string) => {
     setLoadingInvoiceId(invoiceId);
@@ -170,10 +231,10 @@ export default function AdminTab({
               key={tab.id}
               type="button"
               onClick={() => setSection(tab.id)}
-              className={`px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg sm:rounded-t-lg text-[10px] sm:text-xs font-semibold flex items-center justify-center sm:justify-start gap-1 sm:gap-1.5 transition-all border-b-2 -mb-[1px] min-w-0 ${
+              className={`px-2.5 py-2 sm:px-3.5 sm:py-2 rounded-xl text-xs font-semibold flex items-center justify-center sm:justify-start gap-1.5 transition-all min-w-0 cursor-pointer ${
                 active
-                  ? 'text-blue-400 border-blue-500 bg-blue-500/5'
-                  : 'text-slate-400 border-transparent hover:text-slate-200'
+                  ? 'text-blue-600 bg-blue-50 border border-blue-200 font-bold shadow-2xs'
+                  : 'text-slate-600 border border-transparent hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
               <Icon className={styles['admin--w-3-h-3-smw-35']} />
@@ -192,8 +253,8 @@ export default function AdminTab({
             adminCompanies.map((c: any) => (
               <div
                 key={c.id}
-                className={`glass-card rounded-2xl p-5 border flex flex-col gap-4 ${
-                  c.isActive === false ? 'border-red-500/30 opacity-75' : 'border-white/5'
+                className={`bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col gap-4 ${
+                  c.isActive === false ? 'border-rose-300 opacity-80' : ''
                 }`}
               >
                 <div className={styles['admin--flex-justify-between-items-center']}>
@@ -211,18 +272,34 @@ export default function AdminTab({
                       )}
                     </h3>
                     <p className={styles['admin--text-10px-text-slate-500-mt-1']}>
-                      GSTIN: {c.gstin} | Status:{' '}
+                      GSTIN: <span className="font-semibold text-slate-700">{c.gstin}</span> | Status:{' '}
                       <span className={styles['admin--font-semibold-text-blue-400']}>{c.status}</span>
                     </p>
                   </div>
                   <div className={styles['admin--flex-gap-2']}>
+                    {/* Impersonate Company Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleImpersonate(c)}
+                      disabled={impersonatingId === c.id}
+                      className={styles['admin--impersonate-btn']}
+                      title={`Login as ${c.name} to view complete profile and portal`}
+                    >
+                      {impersonatingId === c.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600" />
+                      ) : (
+                        <UserCheck className="w-3.5 h-3.5 text-purple-600" />
+                      )}
+                      <span>Impersonate</span>
+                    </button>
+
                     <button
                       onClick={() => handleToggleActive(c.id, c.isActive !== false)}
                       disabled={togglingId === c.id}
-                      className={`py-1.5 px-4 rounded-lg text-xs font-bold transition-all flex items-center gap-2 disabled:opacity-50 ${
+                      className={`py-1.5 px-3.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer ${
                         c.isActive !== false
-                          ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20'
-                          : 'bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20'
+                          ? 'bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200'
+                          : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200'
                       }`}
                     >
                       {togglingId === c.id && <Loader2 className={styles['admin--w-3-h-3-animate-spin']} />}
@@ -256,7 +333,8 @@ export default function AdminTab({
                           }
                           className={styles['admin--text-10px-flex-items-center']}
                         >
-                          {doc.documentType.replace('_', ' ')} <ExternalLink className={styles['admin--w-3-h-3']} />
+                          <span>{doc.documentType.replace(/_/g, ' ')}</span>
+                          <ExternalLink className={styles['admin--w-3-h-3']} />
                         </button>
                       ))}
                     </div>
@@ -272,23 +350,28 @@ export default function AdminTab({
 
       {section === 'escrow' && (
         <div className={styles['admin--space-y-4-1']}>
-          {adminPayments.length === 0 ? (
+          {loadingSection ? (
+            <div className="flex items-center justify-center py-12 text-slate-400 gap-2">
+              <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+              <span className="text-xs">Loading escrow payments...</span>
+            </div>
+          ) : payments.length === 0 ? (
             <div className={styles['admin--py-8-text-center-text-slate-500']}>No payments found.</div>
           ) : (
-            adminPayments.map((p: any) => (
+            payments.map((p: any) => (
               <div
                 key={p.id}
-                className={`glass-card glass-card ${styles['admin--glass-card-rounded-2xl-p-5']}`}
+                className={styles['admin--glass-card-rounded-2xl-p-5']}
               >
                 <div>
                   <div className={styles['admin--flex-gap-2-items-center']}>
                     <span
                       className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
                         p.status === 'HELD'
-                          ? 'bg-yellow-500/10 text-yellow-500'
+                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
                           : p.status === 'RELEASED'
-                            ? 'bg-green-500/10 text-green-400'
-                            : 'bg-slate-500/10 text-slate-400'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-slate-100 text-slate-600 border border-slate-200'
                       }`}
                     >
                       {p.status}
@@ -342,10 +425,15 @@ export default function AdminTab({
 
       {section === 'invoices' && (
         <div className={styles['admin--space-y-3']}>
-          {adminInvoices.length === 0 ? (
+          {loadingSection ? (
+            <div className="flex items-center justify-center py-12 text-slate-400 gap-2">
+              <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+              <span className="text-xs">Loading invoices...</span>
+            </div>
+          ) : invoices.length === 0 ? (
             <div className={styles['admin--py-8-text-center-text-slate-500-1']}>No invoices found.</div>
           ) : (
-            adminInvoices.map((inv: any) => (
+            invoices.map((inv: any) => (
               <div
                 key={inv.id}
                 className={styles['admin--glass-card-rounded-xl-p-4']}
@@ -359,10 +447,10 @@ export default function AdminTab({
                     <span
                       className={`text-[10px] uppercase px-2 py-0.5 rounded font-bold ${
                         inv.status === 'PAID'
-                          ? 'bg-green-500/10 text-green-400'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                           : inv.status === 'UNPAID'
-                            ? 'bg-yellow-500/10 text-yellow-400'
-                            : 'bg-slate-500/10 text-slate-400'
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : 'bg-slate-100 text-slate-600 border border-slate-200'
                       }`}
                     >
                       {inv.status}
@@ -401,10 +489,15 @@ export default function AdminTab({
 
       {section === 'users' && (
         <div className={styles['admin--space-y-4-2']}>
-          {adminUsers.length === 0 ? (
+          {loadingSection ? (
+            <div className="flex items-center justify-center py-12 text-slate-400 gap-2">
+              <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+              <span className="text-xs">Loading users...</span>
+            </div>
+          ) : users.length === 0 ? (
             <div className={styles['admin--py-8-text-center-text-slate-500-2']}>No users found.</div>
           ) : (
-            adminUsers.map((u: any) => (
+            users.map((u: any) => (
               <div
                 key={u.id}
                 className={styles['admin--glass-card-rounded-2xl-p-5-1']}
@@ -445,6 +538,24 @@ export default function AdminTab({
                       </div>
                     </div>
                   </div>
+                  {u.company && (
+                    <div className="shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleImpersonate(u.company)}
+                        disabled={impersonatingId === u.company.id}
+                        className={styles['admin--impersonate-btn']}
+                        title={`Impersonate ${u.company.name}`}
+                      >
+                        {impersonatingId === u.company.id ? (
+                          <Loader2 className={styles['admin--w-3-h-3-animate-spin-6']} />
+                        ) : (
+                          <UserCheck className={styles['admin--w-3-h-3-text-purple-600']} />
+                        )}
+                        <span>Impersonate</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))
@@ -475,11 +586,16 @@ export default function AdminTab({
             )}
           </div>
 
-          {sampleDeliveries.length === 0 ? (
+          {loadingSection ? (
+            <div className="flex items-center justify-center py-12 text-slate-400 gap-2">
+              <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+              <span className="text-xs">Loading sample deliveries...</span>
+            </div>
+          ) : deliveries.length === 0 ? (
             <p className={styles['admin--text-sm-text-slate-500-py-4']}>No sample pickup jobs right now.</p>
           ) : (
             <div className={styles['admin--space-y-2']}>
-              {sampleDeliveries.map((del: any) => (
+              {deliveries.map((del: any) => (
                 <div
                   key={del.id}
                   className={styles['admin--p-3-bg-slate-90050-rounded-xl']}

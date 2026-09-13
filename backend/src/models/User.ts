@@ -12,11 +12,20 @@ export const RefreshToken = mongoose.models.RefreshToken || mongoose.model('Refr
 
 // Notification
 const NotificationSchema = new Schema({
-  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  userId: { type: Schema.Types.ObjectId, ref: 'User' },
+  companyId: { type: Schema.Types.ObjectId, ref: 'Company' },
   title: { type: String, required: true },
   message: { type: String, required: true },
-  read: { type: Boolean, default: false }
-}, { timestamps: { createdAt: true, updatedAt: false }, collection: 'Notification' });
+  type: {
+    type: String,
+    enum: ['ORDER', 'RFQ', 'BID', 'LOGISTICS', 'PAYMENT', 'SAMPLING', 'CHAT', 'SYSTEM'],
+    default: 'SYSTEM'
+  },
+  link: { type: String, default: '/dashboard' },
+  read: { type: Boolean, default: false },
+  readBy: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+  meta: { type: Schema.Types.Mixed }
+}, { timestamps: true, collection: 'Notification' });
 
 export const Notification = mongoose.models.Notification || mongoose.model('Notification', NotificationSchema);
 

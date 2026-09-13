@@ -67,6 +67,11 @@ export async function POST(req: NextRequest, { params }: Params) {
           `Congratulations! Your bid was selected for RFQ ${rfq.rfqNumber}. A new Purchase Order has been created.`
         );
       }
+      await broadcastCompanyUpdate(
+        user.companyId,
+        'order_created',
+        `Winner selected for RFQ ${rfq.rfqNumber}. Purchase Order(s) generated successfully.`
+      );
     }
 
     return NextResponse.json({

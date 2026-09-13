@@ -24,13 +24,31 @@ export function resolveToastType(data: {
 }
 
 export function shouldDeliverEventToCompany(eventData: any, companyId: string): boolean {
-  if (!eventData) return false;
+  if (!eventData || !companyId) return false;
+
+  // 1. Explicit exclusion of this company (e.g. self-published RFQ)
+  if (eventData.excludeCompanyId && String(eventData.excludeCompanyId) === String(companyId)) {
+    return false;
+  }
+  if (
+    eventData.senderCompanyId &&
+    (eventData.excludeSender || eventData.eventType === 'marketplace_rfq_published') &&
+    String(eventData.senderCompanyId) === String(companyId)
+  ) {
+    return false;
+  }
+
+  // 2. Target specific companies
+  const targets: string[] = eventData.targetCompanyIds || [];
+  if (targets.length > 0) {
+    return targets.includes(String(companyId));
+  }
+
+  // 3. Broadcast to all (when not explicitly excluded)
   if (eventData.target === 'all') return true;
 
-  const targets: string[] = eventData.targetCompanyIds || [];
-  if (!targets.length) return true;
-
-  return targets.includes(companyId) || eventData.companyId === companyId;
+  // 4. Company-specific event
+  return eventData.companyId ? String(eventData.companyId) === String(companyId) : true;
 }
 
 /** Show toast for chat only when the message is from the counterparty, not your own company. */

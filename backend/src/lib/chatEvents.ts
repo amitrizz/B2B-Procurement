@@ -38,13 +38,32 @@ export async function broadcastChatMessage(params: {
         : params.buyerCompanyId;
 
     await db();
-    const { User } = await import('@/models/User');
-    const users = await User.find({ companyId: recipientCompanyId }).lean() as any[];
+    const { User, Notification } = await import('@/models/User');
 
     const pushTitle = params.poNumber
       ? `New chat message · ${params.poNumber}`
       : 'New company chat message';
     const pushBody = `${params.senderCompanyName}: ${params.label}`;
+
+    // 1. Persist notification in DB
+    const mongoose = (await import('mongoose')).default;
+    if (recipientCompanyId && mongoose.Types.ObjectId.isValid(recipientCompanyId)) {
+      await Notification.create({
+        companyId: new mongoose.Types.ObjectId(recipientCompanyId),
+        title: pushTitle,
+        message: pushBody,
+        type: 'CHAT',
+        link: '/dashboard/company_chat',
+        read: false,
+        meta: {
+          threadId: params.threadId,
+          purchaseOrderId: params.purchaseOrderId,
+          poNumber: params.poNumber
+        }
+      }).catch(() => {});
+    }
+
+    const users = await User.find({ companyId: recipientCompanyId }).lean() as any[];
 
     await Promise.all(
       users.map((u) =>
@@ -52,7 +71,7 @@ export async function broadcastChatMessage(params: {
           title: pushTitle,
           body: pushBody,
           url: '/chat',
-        })
+        }).catch(() => {})
       )
     );
   } catch (error) {

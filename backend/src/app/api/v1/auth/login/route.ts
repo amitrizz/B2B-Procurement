@@ -5,26 +5,27 @@ import { verifyPassword, generateAccessToken, generateRefreshToken } from '@/lib
 export async function POST(req: NextRequest) {
     console.log(`[API] ${req.method} ${req.nextUrl?.pathname || req.url}`);
   try {
-    const { email, password } = await req.json();
+    const { email, password, loginMethod, requestOtp } = await req.json();
 
-    console.log('[API] /login - Step 1: Validating payload');
-    if (!email || !password) {
-      console.log('[API] /login - Error: Missing email or password');
-      return console.log(`[API Response] /api/v1/auth/login - Sending response`), NextResponse.json(
-        { success: false, code: 'BAD_REQUEST', message: 'Missing email or password' },
+    if (!email) {
+      return NextResponse.json(
+        { success: false, code: 'BAD_REQUEST', message: 'Email address is required' },
         { status: 400 }
       );
     }
 
-    console.log(`[API] /login - Step 2: Fetching user ${email} from database`);
+    const cleanEmail = email.trim().toLowerCase();
+    const isOtpLogin = loginMethod === 'otp' || requestOtp || !password;
+
+    console.log(`[API] /login - Method: ${isOtpLogin ? 'OTP' : 'PASSWORD'} for ${cleanEmail}`);
 
     await db();
-    const { User } = await import('@/models/User');
+    const { User, RefreshToken: RefreshTokenModel } = await import('@/models/User');
     await import('@/models/Company');
 
-    const userDoc = await User.findOne({ email }).populate('companyId').lean() as any;
+    const userDoc = await User.findOne({ email: cleanEmail }).populate('companyId').lean() as any;
     
-    // Map Mongoose object to match expected Prisma format
+    // Map Mongoose object to match expected format
     const user = userDoc ? {
       ...userDoc,
       id: userDoc._id.toString(),
@@ -35,23 +36,57 @@ export async function POST(req: NextRequest) {
     } : null;
 
     if (!user) {
-      console.log(`[API] /login - Error: User ${email} not found`);
-      return console.log(`[API Response] /api/v1/auth/login - Sending response`), NextResponse.json(
-        { success: false, code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' },
+      return NextResponse.json(
+        { success: false, code: 'INVALID_CREDENTIALS', message: 'No account found with this email address' },
         { status: 401 }
       );
     }
 
-    console.log(`[API] /login - Step 3: Verifying password for ${email}`);
+    // --- OPTION 1: SIGN IN WITH OTP ---
+    if (isOtpLogin) {
+      // Generate 6-digit numeric OTP
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      const { AuthOtp } = await import('@/models/AuthOtp');
+      await AuthOtp.findOneAndUpdate(
+        { email: cleanEmail, type: 'LOGIN' },
+        { $set: { otp, expiresAt } },
+        { upsert: true, new: true }
+      );
+
+      // Prominently print OTP on backend terminal console
+      console.log('\n' + '='.repeat(54));
+      console.log('  🔐 [LOGIN OTP GENERATED]');
+      console.log(`  👤 Email   : ${cleanEmail}`);
+      console.log(`  🔑 OTP CODE: \x1b[1m\x1b[32m${otp}\x1b[0m`);
+      console.log(`  ⏰ Expires : 10 minutes`);
+      console.log('='.repeat(54) + '\n');
+
+      // Send OTP via email
+      const { sendOtpEmail } = await import('@/lib/email');
+      const emailResult = await sendOtpEmail({ to: cleanEmail, otp, type: 'LOGIN' });
+
+      return NextResponse.json({
+        success: true,
+        requireOtp: true,
+        email: user.email,
+        emailSent: emailResult.sent,
+        message: emailResult.sent 
+          ? 'OTP code sent to your email address.' 
+          : 'OTP code generated. Check backend console to sign in.'
+      });
+    }
+
+    // --- OPTION 2: SIGN IN WITH PASSWORD ---
     if (!verifyPassword(password, user.passwordHash)) {
-      console.log(`[API] /login - Error: Invalid password for ${email}`);
-      return console.log(`[API Response] /api/v1/auth/login - Sending response`), NextResponse.json(
-        { success: false, code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' },
+      return NextResponse.json(
+        { success: false, code: 'INVALID_CREDENTIALS', message: 'Incorrect password. Please try again.' },
         { status: 401 }
       );
     }
 
-    console.log(`[API] /login - Step 4: Generating tokens for ${email}`);
+    console.log(`[API] /login - Password verified successfully for ${cleanEmail}`);
 
     const accessToken = generateAccessToken({
       userId: user.id,
@@ -61,15 +96,11 @@ export async function POST(req: NextRequest) {
 
     const refreshToken = generateRefreshToken({ userId: user.id });
 
-    console.log(`[API] /login - Step 5: Saving refresh token in DB`);
-    const { RefreshToken: RefreshTokenModel } = await import('@/models/User');
     await RefreshTokenModel.create({
       userId: user.id,
       token: refreshToken,
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30d
     });
-
-    console.log(`[API] /login - Success: Returning auth response and setting cookies`);
 
     const response = NextResponse.json({
       success: true,
@@ -91,7 +122,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Set cookie
+    // Set cookies
     response.cookies.set('accessToken', accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

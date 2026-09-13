@@ -7,5 +7,5 @@ export default function AdminTabPage() {
   const ctx = useContext(DashboardContext);
   if (!ctx) return null; // Wait for layout to mount
 
-  return <AdminTab adminCompanies={ctx.adminCompanies} adminUsers={ctx.adminUsers} adminPayments={ctx.adminPayments} adminInvoices={ctx.adminInvoices} fetchData={() => ctx.fetchDataRef.current()} handleVerifyCompany={ctx.handleVerifyCompany} />;
+  return <AdminTab adminCompanies={ctx.adminCompanies} adminUsers={ctx.adminUsers} adminPayments={ctx.adminPayments} adminInvoices={ctx.adminInvoices} fetchData={() => ctx.fetchDataRef.current()} handleVerifyCompany={ctx.handleVerifyCompany} handleImpersonateCompany={ctx.handleImpersonateCompany} />;
 }
