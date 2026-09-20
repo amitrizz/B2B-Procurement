@@ -77,42 +77,61 @@ body {
   background-attachment: fixed;
 }
 
-/* Native select fallback (where custom DarkSelect is not used) */
+/* Universal select styling */
 select {
-  color-scheme: dark;
+  color-scheme: light;
+  background-color: #ffffff;
+  color: #001D4A;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  cursor: pointer;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
 select option {
-  background-color: var(--card-bg-light);
-  color: var(--text-title);
+  background-color: #ffffff;
+  color: #001D4A;
+  padding: 6px 10px;
 }
 
 /* Glassmorphism utilities */
-@layer components {
-  .glass-panel {
-    background: var(--card-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--card-border);
-  }
+.glass-panel {
+  background: var(--card-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--card-border);
+}
 
-  .glass-card {
-    background: var(--card-bg-light);
-    border: 1px solid var(--card-border-light);
-    box-shadow: var(--shadow-card);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
+.glass-card {
+  background: var(--card-bg-light);
+  border: 1px solid var(--card-border-light);
+  box-shadow: var(--shadow-card);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
-  .glass-card:hover {
-    border-color: rgba(59, 130, 246, 0.3);
-    box-shadow: 0 10px 30px -10px rgba(59, 130, 246, 0.2);
-    transform: translateY(-2px);
-  }
+.glass-card:hover {
+  border-color: rgba(59, 130, 246, 0.3);
+  box-shadow: 0 10px 30px -10px rgba(59, 130, 246, 0.2);
+  transform: translateY(-2px);
 }
 
 /* Mobile Responsive Optimization Rules */
 @media (max-width: 767px) {
-  /* Prevent auto-zoom on iOS safari input focus */
+  /* Prevent auto-zoom on iOS safari input focus while preserving height */
   input, select, textarea {
     font-size: 16px !important;
   }

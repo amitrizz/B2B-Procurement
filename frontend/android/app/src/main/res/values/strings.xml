@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Kantech</string>
+    <string name="title_activity_main">Kantech</string>
+    <string name="package_name">com.b2bprocurement.app</string>
+    <string name="custom_url_scheme">com.b2bprocurement.app</string>
+</resources>

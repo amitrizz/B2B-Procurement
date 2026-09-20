@@ -107,6 +107,49 @@ export async function GET(req: NextRequest, { params }: Params) {
 
     let rfq: any = null;
     if (rfqDoc.length > 0) {
+      // Gather all unique supplier company IDs across bids to load their machines
+      const supplierIds = new Set<string>();
+      rfqDoc[0].items?.forEach((i: any) => {
+        i.bids?.forEach((b: any) => {
+          const sId = b.supplierCompanyId?.toString() || b.supplierCompany?._id?.toString();
+          if (sId) supplierIds.add(sId);
+        });
+      });
+
+      const { CompanyMachine } = await import('@/models/Company');
+      await import('@/models/Machine');
+      const machinesList = await CompanyMachine.find({
+        companyId: { $in: Array.from(supplierIds) }
+      }).populate('machineId', 'name model description').lean();
+
+      const machinesByCompany: Record<string, any[]> = {};
+      machinesList.forEach((m: any) => {
+        const cId = m.companyId.toString();
+        if (!machinesByCompany[cId]) machinesByCompany[cId] = [];
+
+        const machineName = m.machineId?.name || 'Machine';
+        const machineModel = m.model || m.machineId?.model || '';
+        const count = Number(m.numberOfMachines) || 1;
+
+        const existing = machinesByCompany[cId].find(
+          (item: any) => item.name.toLowerCase().trim() === machineName.toLowerCase().trim()
+        );
+
+        if (existing) {
+          existing.numberOfMachines = (Number(existing.numberOfMachines) || 0) + count;
+          if (!existing.model && machineModel) existing.model = machineModel;
+          if (!existing.specifications && m.specifications) existing.specifications = m.specifications;
+        } else {
+          machinesByCompany[cId].push({
+            id: m._id.toString(),
+            name: machineName,
+            model: machineModel,
+            numberOfMachines: count,
+            specifications: m.specifications || ''
+          });
+        }
+      });
+
       rfq = {
         ...rfqDoc[0],
         id: rfqDoc[0]._id.toString(),
@@ -117,18 +160,23 @@ export async function GET(req: NextRequest, { params }: Params) {
         items: rfqDoc[0].items[0] && rfqDoc[0].items[0]._id ? rfqDoc[0].items.map((i: any) => ({
           ...i,
           id: i._id.toString(),
-          bids: i.bids ? i.bids.map((b: any) => ({
-            ...b,
-            id: b._id.toString(),
-            supplierCompany: b.supplierCompany
-              ? {
-                  id: b.supplierCompanyId?.toString() || b.supplierCompany._id?.toString(),
-                  name: b.supplierCompany.name,
-                }
-              : b.supplierCompanyId
-                ? { id: b.supplierCompanyId.toString(), name: 'Supplier' }
-                : null,
-          })) : []
+          bids: i.bids ? i.bids.map((b: any) => {
+            const supplierId = b.supplierCompanyId?.toString() || b.supplierCompany?._id?.toString() || '';
+            const companyMachines = supplierId ? (machinesByCompany[supplierId] || []) : [];
+            return {
+              ...b,
+              id: b._id.toString(),
+              supplierCompany: b.supplierCompany
+                ? {
+                    id: supplierId,
+                    name: b.supplierCompany.name,
+                    machines: companyMachines,
+                  }
+                : b.supplierCompanyId
+                  ? { id: supplierId, name: 'Supplier', machines: companyMachines }
+                  : null,
+            };
+          }) : []
         })) : []
       };
     }

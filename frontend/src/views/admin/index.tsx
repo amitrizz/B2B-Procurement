@@ -20,11 +20,12 @@ import {
   Plus,
   Trash2,
   Pencil,
+  Cog,
 } from 'lucide-react';
 import AdminChatQaSection from '../chat/components/AdminChatQaSection';
 import CompanyDetailModal from './components/CompanyDetailModal';
 
-type AdminSection = 'verification' | 'escrow' | 'invoices' | 'users' | 'samples' | 'chat_qa' | 'categories';
+type AdminSection = 'verification' | 'escrow' | 'invoices' | 'users' | 'samples' | 'chat_qa' | 'categories' | 'machines';
 
 const ADMIN_TABS: {
   id: AdminSection;
@@ -39,6 +40,7 @@ const ADMIN_TABS: {
   { id: 'samples', label: 'Sample Pickup', shortLabel: 'Pickup', icon: Truck },
   { id: 'chat_qa', label: 'Chat Q&A', shortLabel: 'Q&A', icon: MessageSquare },
   { id: 'categories', label: 'Global Categories', shortLabel: 'Categories', icon: Tag },
+  { id: 'machines', label: 'Master Machines', shortLabel: 'Machines', icon: Cog },
 ];
 
 interface AdminTabProps {
@@ -80,6 +82,18 @@ export default function AdminTab({
   const [catDesc, setCatDesc] = useState('');
   const [savingCat, setSavingCat] = useState(false);
   const [deletingCatId, setDeletingCatId] = useState<string | null>(null);
+
+  // Master Machine state
+  const [machines, setMachines] = useState<any[] | null>(null);
+  const [loadingMachines, setLoadingMachines] = useState(false);
+  const [showMachineModal, setShowMachineModal] = useState(false);
+  const [editingMachineId, setEditingMachineId] = useState<string | null>(null);
+  const [machineName, setMachineName] = useState('');
+  const [machineModel, setMachineModel] = useState('');
+  const [machineDesc, setMachineDesc] = useState('');
+  const [savingMachine, setSavingMachine] = useState(false);
+  const [deletingMachineId, setDeletingMachineId] = useState<string | null>(null);
+
   const [loadingSection, setLoadingSection] = useState(false);
   const [selectedDetailCompanyId, setSelectedDetailCompanyId] = useState<string | null>(null);
 
@@ -128,6 +142,13 @@ export default function AdminTab({
         .then(d => { if (d.success) setCategories(d.data || []); })
         .catch(() => {})
         .finally(() => setLoadingCategories(false));
+    } else if (section === 'machines' && machines === null) {
+      setLoadingMachines(true);
+      fetch(`/api/v1/admin/machines?_t=${Date.now()}`, { headers })
+        .then(r => r.json())
+        .then(d => { if (d.success) setMachines(d.data || []); })
+        .catch(() => {})
+        .finally(() => setLoadingMachines(false));
     }
   }, [section]);
 
@@ -218,6 +239,97 @@ export default function AdminTab({
       alert('Error deleting category');
     } finally {
       setDeletingCatId(null);
+    }
+  };
+
+  const fetchAdminMachines = async () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) return;
+    setLoadingMachines(true);
+    try {
+      const res = await fetch(`/api/v1/admin/machines?_t=${Date.now()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const d = await res.json();
+      if (d.success) setMachines(d.data || []);
+    } catch {
+    } finally {
+      setLoadingMachines(false);
+    }
+  };
+
+  const openAddMachineModal = () => {
+    setEditingMachineId(null);
+    setMachineName('');
+    setMachineModel('');
+    setMachineDesc('');
+    setShowMachineModal(true);
+  };
+
+  const openEditMachineModal = (m: any) => {
+    setEditingMachineId(m.id);
+    setMachineName(m.name || '');
+    setMachineModel(m.model || '');
+    setMachineDesc(m.description || '');
+    setShowMachineModal(true);
+  };
+
+  const handleSaveMachine = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!machineName.trim()) return;
+    setSavingMachine(true);
+    try {
+      const token = localStorage.getItem('token');
+      const url = editingMachineId
+        ? `/api/v1/admin/machines/${editingMachineId}`
+        : '/api/v1/admin/machines';
+      const method = editingMachineId ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: machineName.trim(),
+          model: machineModel.trim(),
+          description: machineDesc.trim()
+        })
+      });
+      const d = await res.json();
+      if (d.success) {
+        setShowMachineModal(false);
+        fetchAdminMachines();
+      } else {
+        alert(d.message || `Failed to ${editingMachineId ? 'update' : 'create'} machine`);
+      }
+    } catch {
+      alert(`Error ${editingMachineId ? 'updating' : 'creating'} machine`);
+    } finally {
+      setSavingMachine(false);
+    }
+  };
+
+  const handleDeleteMachine = async (mId: string, mName: string) => {
+    if (!confirm(`Are you sure you want to delete the master machine "${mName}"?`)) return;
+    setDeletingMachineId(mId);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/v1/admin/machines/${mId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const d = await res.json();
+      if (d.success) {
+        fetchAdminMachines();
+      } else {
+        alert(d.message || 'Failed to delete machine');
+      }
+    } catch {
+      alert('Error deleting machine');
+    } finally {
+      setDeletingMachineId(null);
     }
   };
 
@@ -961,6 +1073,191 @@ export default function AdminTab({
                     >
                       {savingCat && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                       <span>{savingCat ? 'Saving...' : editingCatId ? 'Update Category' : 'Save Global Category'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* MASTER MACHINES SECTION */}
+      {section === 'machines' && (
+        <div className="space-y-4">
+          {/* Top Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+            <div>
+              <h3 className="text-base font-extrabold text-[#001D4A] flex items-center gap-2">
+                <Cog className="w-5 h-5 text-emerald-600" />
+                <span>Master Machine Catalog</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Standard machine types and models that suppliers can select and display in their company fleet
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <RefreshButton onRefresh={fetchAdminMachines} />
+              <button
+                type="button"
+                onClick={openAddMachineModal}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-98"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Machine</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Machine List Grid */}
+          {loadingMachines ? (
+            <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-400">
+              <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
+              <span className="text-xs font-medium">Loading master machines...</span>
+            </div>
+          ) : !machines || machines.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-8 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3 border border-emerald-100">
+                <Cog className="w-6 h-6" />
+              </div>
+              <h4 className="text-sm font-bold text-[#001D4A]">No Master Machines</h4>
+              <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                No machines have been created yet. Click "Add Machine" to define the first machine for the platform.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {machines.map((m: any) => (
+                <div
+                  key={m.id}
+                  className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shrink-0">
+                        <Cog className="w-4 h-4" />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => openEditMachineModal(m)}
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all cursor-pointer"
+                          title="Edit Machine"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deletingMachineId === m.id}
+                          onClick={() => handleDeleteMachine(m.id, m.name)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all cursor-pointer disabled:opacity-50"
+                          title="Delete Machine"
+                        >
+                          {deletingMachineId === m.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-red-500" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                    <h4 className="font-bold text-sm text-[#001D4A]">{m.name}</h4>
+                    {m.model && (
+                      <span className="inline-block mt-1 px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[11px] font-semibold">
+                        Model: {m.model}
+                      </span>
+                    )}
+                    <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                      {m.description || 'No description provided.'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add / Edit Machine Modal */}
+          {showMachineModal && (
+            <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+              <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-5 shadow-2xl">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shrink-0">
+                      <Cog className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-extrabold text-[#001D4A]">
+                        {editingMachineId ? 'Edit Master Machine' : 'Add Master Machine'}
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {editingMachineId ? 'Update machine details in the master catalog' : 'Define a standard machine type for suppliers to pick'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowMachineModal(false)}
+                    className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-all cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveMachine} className="space-y-3.5 pt-3.5">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                      Machine Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. VMC 4-Axis, CNC Lathe, Fiber Laser Cutting..."
+                      value={machineName}
+                      onChange={(e) => setMachineName(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-[#001D4A] placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-emerald-500 transition-all font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                      Model / Make <span className="text-slate-400 font-normal">(optional default)</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Haas VF-2, Mazak Quick Turn, Amada Ensis..."
+                      value={machineModel}
+                      onChange={(e) => setMachineModel(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-[#001D4A] placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-emerald-500 transition-all font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                      Description <span className="text-slate-400 font-normal">(optional)</span>
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Standard description, capacities, or notes..."
+                      value={machineDesc}
+                      onChange={(e) => setMachineDesc(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-[#001D4A] placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-emerald-500 transition-all font-medium resize-none"
+                    />
+                  </div>
+
+                  <div className="flex gap-2.5 pt-3 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setShowMachineModal(false)}
+                      className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={savingMachine}
+                      className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      {savingMachine && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      <span>{savingMachine ? 'Saving...' : editingMachineId ? 'Update Machine' : 'Save Master Machine'}</span>
                     </button>
                   </div>
                 </form>

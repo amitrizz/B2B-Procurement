@@ -44,6 +44,17 @@ const CompanyCapabilitySchema = new Schema({
 
 export const CompanyCapability = mongoose.models.CompanyCapability || mongoose.model('CompanyCapability', CompanyCapabilitySchema);
 
+// CompanyMachine
+const CompanyMachineSchema = new Schema({
+  companyId: { type: Schema.Types.ObjectId, ref: 'Company', required: true, index: true },
+  machineId: { type: Schema.Types.ObjectId, ref: 'MachineMaster', required: true },
+  model: { type: String, trim: true },
+  numberOfMachines: { type: Number, required: true, default: 1, min: 1 },
+  specifications: { type: String, trim: true },
+}, { timestamps: true, collection: 'CompanyMachine' });
+
+export const CompanyMachine = mongoose.models.CompanyMachine || mongoose.model('CompanyMachine', CompanyMachineSchema);
+
 // Company
 const CompanySchema = new Schema({
   gstin: { type: String, required: true, unique: true },

@@ -26,7 +26,10 @@ import {
   Save,
   Link,
   Edit2,
-  Shield
+  Shield,
+  Cog,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { ButtonSpinner } from '@/components/ui/ActionButton';
@@ -47,6 +50,19 @@ export default function ProfileTab({ user, setUser, showToast }: ProfileTabProps
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showBankModal, setShowBankModal] = useState(false);
   const [showKycModal, setShowKycModal] = useState(false);
+  const [showMachineModal, setShowMachineModal] = useState(false);
+
+  // Machinery fleet states
+  const [masterMachines, setMasterMachines] = useState<any[]>([]);
+  const [loadingMasterMachines, setLoadingMasterMachines] = useState(false);
+  const [companyMachines, setCompanyMachines] = useState<any[]>([]);
+  const [loadingCompanyMachines, setLoadingCompanyMachines] = useState(false);
+  const [selectedMasterMachineId, setSelectedMasterMachineId] = useState('');
+  const [fleetModel, setFleetModel] = useState('');
+  const [fleetCount, setFleetCount] = useState<number | string>(1);
+  const [fleetSpecs, setFleetSpecs] = useState('');
+  const [addingMachine, setAddingMachine] = useState(false);
+  const [deletingCompanyMachineId, setDeletingCompanyMachineId] = useState<string | null>(null);
 
   // Form states
   const [companyName, setCompanyName] = useState(user?.company?.name || '');
@@ -111,10 +127,125 @@ export default function ProfileTab({ user, setUser, showToast }: ProfileTabProps
         if (!cancelled) setBankLoading(false);
       }
     })();
+
+    // Load company machines
+    fetchCompanyMachines();
+
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const fetchCompanyMachines = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      setLoadingCompanyMachines(true);
+      const res = await fetch('/api/v1/company/me/machines', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const d = await res.json();
+      if (d.success) {
+        setCompanyMachines(d.data || []);
+      }
+    } catch {
+    } finally {
+      setLoadingCompanyMachines(false);
+    }
+  };
+
+  const fetchMasterMachines = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      setLoadingMasterMachines(true);
+      const res = await fetch('/api/v1/machines', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const d = await res.json();
+      if (d.success) {
+        setMasterMachines(d.data || []);
+      }
+    } catch {
+    } finally {
+      setLoadingMasterMachines(false);
+    }
+  };
+
+  const handleOpenMachineModal = () => {
+    setShowMachineModal(true);
+    fetchMasterMachines();
+    fetchCompanyMachines();
+  };
+
+  const handleAddCompanyMachine = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedMasterMachineId) {
+      showToast('Please select a machine from the catalog', 'error');
+      return;
+    }
+    const count = Number(fleetCount) || 1;
+    if (count < 1) {
+      showToast('Number of machines must be at least 1', 'error');
+      return;
+    }
+
+    setAddingMachine(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/v1/company/me/machines', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          machineId: selectedMasterMachineId,
+          model: fleetModel.trim(),
+          numberOfMachines: count,
+          specifications: fleetSpecs.trim()
+        })
+      });
+      const d = await res.json();
+      if (d.success) {
+        showToast('Machine added to your company fleet', 'success');
+        setSelectedMasterMachineId('');
+        setFleetModel('');
+        setFleetCount(1);
+        setFleetSpecs('');
+        fetchCompanyMachines();
+      } else {
+        showToast(d.message || 'Failed to add machine', 'error');
+      }
+    } catch {
+      showToast('Error adding machine', 'error');
+    } finally {
+      setAddingMachine(false);
+    }
+  };
+
+  const handleDeleteCompanyMachine = async (id: string, name: string) => {
+    if (!confirm(`Remove "${name}" from your company machinery?`)) return;
+    setDeletingCompanyMachineId(id);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/v1/company/me/machines/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const d = await res.json();
+      if (d.success) {
+        showToast('Machine removed from fleet', 'info');
+        fetchCompanyMachines();
+      } else {
+        showToast(d.message || 'Failed to remove machine', 'error');
+      }
+    } catch {
+      showToast('Error removing machine', 'error');
+    } finally {
+      setDeletingCompanyMachineId(null);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.clear();
@@ -669,8 +800,24 @@ export default function ProfileTab({ user, setUser, showToast }: ProfileTabProps
         </div>
       </div>
 
-      {/* Additional Management: Bank Payouts & KYC Documents */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* Additional Management: Bank Payouts, KYC Documents & Machinery Fleet */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <button
+          type="button"
+          onClick={handleOpenMachineModal}
+          className="bg-white hover:bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 text-left shadow-2xs transition-all flex items-center gap-2.5 cursor-pointer group"
+        >
+          <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <Cog className="w-4 h-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h4 className="text-xs font-bold text-[#001D4A] truncate">Machinery Fleet</h4>
+            <p className="text-[10px] text-slate-400 truncate">
+              {companyMachines.length > 0 ? `${companyMachines.length} machine${companyMachines.length > 1 ? 's' : ''} listed` : 'Add working machines'}
+            </p>
+          </div>
+        </button>
+
         <button
           type="button"
           onClick={() => setShowBankModal(true)}
@@ -1182,6 +1329,218 @@ export default function ProfileTab({ user, setUser, showToast }: ProfileTabProps
                   </div>
                 );
               })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Machinery & Equipment Fleet */}
+      {showMachineModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+          onClick={() => setShowMachineModal(false)}
+        >
+          <div
+            className="relative max-w-xl w-full max-h-[90vh] bg-white border border-slate-200 rounded-3xl shadow-2xl p-5 sm:p-6 text-slate-800 flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex justify-between items-start pb-4 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center shrink-0">
+                  <Cog className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-[#001D4A]">
+                    Machinery & Equipment Fleet
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Machines your company operates. Displayed to buyers during RFQ bid comparisons.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMachineModal(false)}
+                className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto pt-4 space-y-5 pr-1">
+              {/* Add Machine Form */}
+              <form onSubmit={handleAddCompanyMachine} className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4 space-y-3">
+                <h4 className="text-xs font-bold text-[#001D4A] flex items-center gap-1.5 uppercase tracking-wider">
+                  <Plus className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Add Machine to Fleet</span>
+                </h4>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                    Select Machine Type <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    required
+                    value={selectedMasterMachineId}
+                    onChange={(e) => {
+                      const selId = e.target.value;
+                      setSelectedMasterMachineId(selId);
+                      const found = masterMachines.find((m) => m.id === selId);
+                      if (found && found.model && !fleetModel) {
+                        setFleetModel(found.model);
+                      }
+                    }}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-[#001D4A] focus:outline-none focus:border-blue-500 transition-all font-medium cursor-pointer truncate"
+                  >
+                    <option value="">-- Select Machine Type --</option>
+                    {masterMachines.map((m: any) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} {m.model ? `(${m.model})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {loadingMasterMachines && (
+                    <span className="text-[10px] text-slate-400 mt-1 block">Loading available machines...</span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      Model / Make
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Haas VF-2, Mazak Quick Turn"
+                      value={fleetModel}
+                      onChange={(e) => setFleetModel(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-[#001D4A] placeholder:text-slate-400 focus:outline-none focus:border-blue-500 transition-all font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      No. of Machines <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      required
+                      placeholder="e.g. 1, 2, 5"
+                      value={fleetCount}
+                      onChange={(e) => setFleetCount(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-[#001D4A] placeholder:text-slate-400 focus:outline-none focus:border-blue-500 transition-all font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                    Technical Specifications / Bed Size / Capacity
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 1000x500mm bed, 12,000 RPM, 4-Axis, 15 Ton"
+                    value={fleetSpecs}
+                    onChange={(e) => setFleetSpecs(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-[#001D4A] placeholder:text-slate-400 focus:outline-none focus:border-blue-500 transition-all font-medium"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={addingMachine || !selectedMasterMachineId}
+                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  {addingMachine ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Adding Machine...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      <span>Add Machine to Fleet</span>
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* Current Fleet List */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-[#001D4A]">
+                    Registered Machinery ({companyMachines.length})
+                  </h4>
+                  {loadingCompanyMachines && (
+                    <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin" /> Refreshing...
+                    </span>
+                  )}
+                </div>
+
+                {companyMachines.length === 0 ? (
+                  <div className="bg-slate-50 rounded-2xl border border-dashed border-slate-200 p-6 text-center">
+                    <p className="text-xs text-slate-400 font-medium">
+                      No machines listed yet. Choose an equipment type above to add it to your company profile.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {companyMachines.map((m: any) => (
+                      <div
+                        key={m.id}
+                        className="bg-white border border-slate-200 rounded-2xl p-3.5 flex items-start justify-between gap-3 shadow-2xs hover:border-slate-300 transition-all"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <span className="text-xs font-bold text-[#001D4A]">{m.name}</span>
+                            <span className="px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200/80 text-blue-700 text-[10px] font-extrabold">
+                              {m.numberOfMachines || 1} {Number(m.numberOfMachines) > 1 ? 'Units' : 'Unit'}
+                            </span>
+                            {m.model && (
+                              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-semibold">
+                                Model: {m.model}
+                              </span>
+                            )}
+                          </div>
+                          {m.specifications && (
+                            <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+                              Specs: {m.specifications}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          disabled={deletingCompanyMachineId === m.id}
+                          onClick={() => handleDeleteCompanyMachine(m.id, m.name)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer disabled:opacity-50 shrink-0"
+                          title="Remove machine"
+                        >
+                          {deletingCompanyMachineId === m.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-500" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="pt-4 mt-2 border-t border-slate-100 shrink-0 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowMachineModal(false)}
+                className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all cursor-pointer"
+              >
+                Done
+              </button>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-@reference "../../app/globals.css";
+@reference "tailwindcss";
 
 .rfq--container {
   @apply space-y-5;
@@ -527,3 +527,4 @@
 .rfq--modal-spinner {
   @apply w-4 h-4 animate-spin;
 }
+

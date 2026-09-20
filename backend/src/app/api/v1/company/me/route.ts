@@ -11,7 +11,8 @@ export async function GET(req: NextRequest) {
     if (!user || !user.companyId) return authErrorResponse();
 
     await db();
-    const { Company, CompanyAddress, CompanyDocument, CompanyBankAccount } = await import('@/models/Company');
+    const { Company, CompanyAddress, CompanyDocument, CompanyBankAccount, CompanyMachine } = await import('@/models/Company');
+    await import('@/models/Machine');
 
     const companyDoc = await Company.findById(user.companyId).lean() as any;
 
@@ -23,13 +24,25 @@ export async function GET(req: NextRequest) {
     const addresses = await CompanyAddress.find({ companyId: user.companyId }).lean();
     const documents = await CompanyDocument.find({ companyId: user.companyId }).lean();
     const bankAccount = await CompanyBankAccount.findOne({ companyId: user.companyId }).lean() as any;
+    const machines = await CompanyMachine.find({ companyId: user.companyId })
+      .populate('machineId', 'name model description')
+      .lean();
 
     const company = {
       ...companyDoc,
       id: companyDoc._id.toString(),
       addresses: addresses.map((a: any) => ({ ...a, id: a._id.toString() })),
       documents: documents.map((d: any) => ({ ...d, id: d._id.toString() })),
-      bankAccount: bankAccount ? { ...bankAccount, id: bankAccount._id.toString() } : null
+      bankAccount: bankAccount ? { ...bankAccount, id: bankAccount._id.toString() } : null,
+      machines: machines.map((m: any) => ({
+        id: m._id.toString(),
+        machineId: m.machineId?._id?.toString() || m.machineId?.toString() || '',
+        name: m.machineId?.name || 'Unknown Machine',
+        model: m.model || m.machineId?.model || '',
+        numberOfMachines: m.numberOfMachines || 1,
+        specifications: m.specifications || '',
+        createdAt: m.createdAt
+      }))
     };
 
     console.log(`[API] /company/me - Success: Returning company details`);

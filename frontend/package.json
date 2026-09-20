@@ -13,9 +13,13 @@
     "start:prod": "node scripts/run-env.mjs prod next start",
     "lint": "eslint",
     "env:init": "node scripts/init-env.mjs",
-    "env:check": "node scripts/run-env.mjs dev node -e \"console.log('Frontend dev env OK if .env.dev exists')\""
+    "env:check": "node scripts/run-env.mjs dev node -e \"console.log('Frontend dev env OK if .env.dev exists')\"",
+    "cap:sync": "cap sync android",
+    "cap:open": "cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
     "centrifuge": "^5.7.2",
     "lucide-react": "^1.33.0",
     "next": "16.3.2",
@@ -24,6 +28,7 @@
     "sass": "^1.104.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

@@ -705,8 +705,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         const d = await res.json();
         if (d.success) setCatalogItems(d.data);
       }
-    } catch (err) {
-      console.error('Error fetching data:', err);
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') {
+        console.error('Error fetching data:', err);
+      }
     } finally {
       if (!isBackground) setLoading(false);
     }
