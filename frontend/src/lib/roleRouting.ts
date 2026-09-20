@@ -1,5 +1,9 @@
-/** Default landing route after login for each role. */
-export function getDefaultRouteForRole(role?: string | null): string {
+import { readDashboardMode, type DashboardMode } from './userSession';
+
+export { type DashboardMode };
+
+/** Default landing route after login for each role and dashboard mode. */
+export function getDefaultRouteForRole(role?: string | null, mode?: DashboardMode): string {
   switch (role) {
     case 'PLATFORM_ADMIN':
       return '/dashboard/admin';
@@ -7,8 +11,10 @@ export function getDefaultRouteForRole(role?: string | null): string {
       return '/dashboard/delivery';
     case 'FINANCE':
       return '/dashboard/orders';
-    default:
-      return '/dashboard/marketplace';
+    default: {
+      const activeMode = mode ?? (typeof window !== 'undefined' ? readDashboardMode() : 'buyer');
+      return activeMode === 'buyer' ? '/dashboard/rfqs' : '/dashboard/marketplace';
+    }
   }
 }
 
@@ -42,20 +48,25 @@ export function getRouteForTab(tab: string): string {
   return '/dashboard/marketplace';
 }
 
-export type DashboardMode = 'buyer' | 'seller';
-
 /** Tabs that are strictly restricted to Buyer (Procure) mode */
 export const BUYER_ONLY_TABS = ['prs', 'requisitions'];
+
+/** Tabs that are strictly restricted to Seller (Supply) mode */
+export const SELLER_ONLY_TABS = ['marketplace'];
 
 /** Checks if a tab is allowed for the active dashboard mode */
 export function isTabAllowedForMode(tab: string, mode: DashboardMode): boolean {
   if (mode === 'seller') {
     return !BUYER_ONLY_TABS.includes(tab);
   }
+  if (mode === 'buyer') {
+    return !SELLER_ONLY_TABS.includes(tab);
+  }
   return true;
 }
 
 /** Route to redirect to when a tab is not allowed for the given mode */
 export function getDefaultRouteForMode(mode: DashboardMode): string {
-  return mode === 'seller' ? '/dashboard/rfqs' : '/dashboard/requisitions';
+  return '/dashboard/rfqs';
 }
+

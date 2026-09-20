@@ -18,6 +18,7 @@ export default function StandardCatalogTab({ user, companyComponents, companyCat
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   
   const [newComponentName, setNewComponentName] = useState('');
+  const [newComponentCategory, setNewComponentCategory] = useState('');
   const [newComponentDesc, setNewComponentDesc] = useState('');
   const [newComponentUnit, setNewComponentUnit] = useState('pcs');
 
@@ -38,6 +39,8 @@ export default function StandardCatalogTab({ user, companyComponents, companyCat
         },
         body: JSON.stringify({
           componentName: newComponentName,
+          category: newComponentCategory || 'General',
+          categoryName: newComponentCategory || 'General',
           description: newComponentDesc,
           defaultUnit: newComponentUnit
         })
@@ -48,6 +51,7 @@ export default function StandardCatalogTab({ user, companyComponents, companyCat
         showToast('Component added to standard catalog!', 'success');
         setShowAddModal(false);
         setNewComponentName('');
+        setNewComponentCategory('');
         setNewComponentDesc('');
         setNewComponentUnit('pcs');
         fetchData(); // Refresh the list
@@ -134,11 +138,14 @@ export default function StandardCatalogTab({ user, companyComponents, companyCat
           companyComponents.map(comp => (
             <div key={comp.id} className={styles['standard_catalog--glass-card-rounded-2xl-p-5']}>
               <div>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase tracking-wider">
+                    {comp.category || comp.categoryName || 'General'}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium">Unit: <span className="text-white font-semibold">{comp.defaultUnit}</span></span>
+                </div>
                 <h3 className={styles['standard_catalog--font-bold-text-base-text-white']}>{comp.componentName}</h3>
                 <p className={styles['standard_catalog--text-xs-text-slate-400-mt-15']}>{comp.description || 'No description provided.'}</p>
-              </div>
-              <div className={styles['standard_catalog--mt-4-pt-3-border-t']}>
-                <span>Unit: <span className={styles['standard_catalog--text-white-font-semibold']}>{comp.defaultUnit}</span></span>
               </div>
             </div>
           ))
@@ -148,13 +155,13 @@ export default function StandardCatalogTab({ user, companyComponents, companyCat
       <div className={styles['standard_catalog--flex-flex-col-smflex-row-1']}>
         <div>
           <h2 className={styles['standard_catalog--text-xl-font-bold-text-white-1']}>
-            <Package className={styles['standard_catalog--w-5-h-5-text-blue-400-1']} /> Standard RFQ Categories
+            <Package className={styles['standard_catalog--w-5-h-5-text-blue-400-1']} /> Platform Global Categories
           </h2>
           <p className={styles['standard_catalog--text-xs-text-slate-400-mt-1-1']}>
-            Maintain a standard list of categories for consistent RFQ creation.
+            Standard platform categories common across all companies for components and RFQs.
           </p>
         </div>
-        {isOwner && (
+        {user?.role === 'PLATFORM_ADMIN' && (
           <button
             onClick={() => setShowAddCategoryModal(true)}
             className={styles['standard_catalog--py-25-px-4-bg-blue-600-1']}
@@ -196,6 +203,25 @@ export default function StandardCatalogTab({ user, companyComponents, companyCat
                   onChange={(e) => setNewComponentName(e.target.value)}
                   className={styles['standard_catalog--w-full-bg-slate-950-border']}
                 />
+              </div>
+              <div className={styles['standard_catalog--space-y-1-2']}>
+                <label className={styles['standard_catalog--text-10px-text-slate-500-font-bold-2']}>
+                  Global Category <span className={styles['standard_catalog--text-red-500']}>*</span>
+                </label>
+                <select
+                  required
+                  value={newComponentCategory}
+                  onChange={(e) => setNewComponentCategory(e.target.value)}
+                  className={styles['standard_catalog--w-full-bg-slate-950-border-1']}
+                >
+                  <option value="" disabled>Select global category...</option>
+                  {companyCategories?.map(c => (
+                    <option key={c.id} value={c.categoryName}>{c.categoryName}</option>
+                  ))}
+                  {(!companyCategories || companyCategories.length === 0) && (
+                    <option value="General">General</option>
+                  )}
+                </select>
               </div>
               <div className={styles['standard_catalog--space-y-1-1']}>
                 <label className={styles['standard_catalog--text-10px-text-slate-500-font-bold-1']}>Description</label>

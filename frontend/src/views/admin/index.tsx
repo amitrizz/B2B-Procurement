@@ -16,10 +16,14 @@ import {
   MessageSquare,
   UserCheck,
   KeyRound,
+  Tag,
+  Plus,
+  Trash2,
+  Pencil,
 } from 'lucide-react';
 import AdminChatQaSection from '../chat/components/AdminChatQaSection';
 
-type AdminSection = 'verification' | 'escrow' | 'invoices' | 'users' | 'samples' | 'chat_qa';
+type AdminSection = 'verification' | 'escrow' | 'invoices' | 'users' | 'samples' | 'chat_qa' | 'categories';
 
 const ADMIN_TABS: {
   id: AdminSection;
@@ -33,6 +37,7 @@ const ADMIN_TABS: {
   { id: 'users', label: 'List of Users', shortLabel: 'Users', icon: Users },
   { id: 'samples', label: 'Sample Pickup', shortLabel: 'Pickup', icon: Truck },
   { id: 'chat_qa', label: 'Chat Q&A', shortLabel: 'Q&A', icon: MessageSquare },
+  { id: 'categories', label: 'Global Categories', shortLabel: 'Categories', icon: Tag },
 ];
 
 interface AdminTabProps {
@@ -66,6 +71,14 @@ export default function AdminTab({
   const [internalUsers, setInternalUsers] = useState<any[] | null>(null);
   const [internalInvoices, setInternalInvoices] = useState<any[] | null>(null);
   const [internalDeliveries, setInternalDeliveries] = useState<any[] | null>(null);
+  const [categories, setCategories] = useState<any[] | null>(null);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [showCatModal, setShowCatModal] = useState(false);
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [catName, setCatName] = useState('');
+  const [catDesc, setCatDesc] = useState('');
+  const [savingCat, setSavingCat] = useState(false);
+  const [deletingCatId, setDeletingCatId] = useState<string | null>(null);
   const [loadingSection, setLoadingSection] = useState(false);
 
   const payments = internalPayments !== null ? internalPayments : (adminPayments || []);
@@ -106,8 +119,105 @@ export default function AdminTab({
         .then(d => { if (d.success) setInternalDeliveries(d.data || []); })
         .catch(() => {})
         .finally(() => setLoadingSection(false));
+    } else if (section === 'categories' && categories === null) {
+      setLoadingCategories(true);
+      fetch(`/api/v1/company/categories?_t=${Date.now()}`, { headers })
+        .then(r => r.json())
+        .then(d => { if (d.success) setCategories(d.data || []); })
+        .catch(() => {})
+        .finally(() => setLoadingCategories(false));
     }
   }, [section]);
+
+  const fetchAdminCategories = async () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) return;
+    setLoadingCategories(true);
+    try {
+      const res = await fetch(`/api/v1/company/categories?_t=${Date.now()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const d = await res.json();
+      if (d.success) setCategories(d.data || []);
+    } catch {
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
+  const openAddCategoryModal = () => {
+    setEditingCatId(null);
+    setCatName('');
+    setCatDesc('');
+    setShowCatModal(true);
+  };
+
+  const openEditCategoryModal = (cat: any) => {
+    setEditingCatId(cat.id);
+    setCatName(cat.categoryName || '');
+    setCatDesc(cat.description || '');
+    setShowCatModal(true);
+  };
+
+  const handleSaveCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!catName.trim()) return;
+    setSavingCat(true);
+    try {
+      const token = localStorage.getItem('token');
+      const url = editingCatId
+        ? `/api/v1/company/categories/${editingCatId}`
+        : '/api/v1/company/categories';
+      const method = editingCatId ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ categoryName: catName.trim(), description: catDesc.trim() })
+      });
+      const d = await res.json();
+      if (d.success) {
+        setCatName('');
+        setCatDesc('');
+        setEditingCatId(null);
+        setShowCatModal(false);
+        fetchAdminCategories();
+        fetchData();
+      } else {
+        alert(d.message || `Failed to ${editingCatId ? 'update' : 'create'} category`);
+      }
+    } catch {
+      alert(`Error ${editingCatId ? 'updating' : 'creating'} category`);
+    } finally {
+      setSavingCat(false);
+    }
+  };
+
+  const handleDeleteCategory = async (catId: string, catName: string) => {
+    if (!confirm(`Are you sure you want to delete the category "${catName}"?`)) return;
+    setDeletingCatId(catId);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/v1/company/categories/${catId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const d = await res.json();
+      if (d.success) {
+        fetchAdminCategories();
+        fetchData();
+      } else {
+        alert(d.message || 'Failed to delete category');
+      }
+    } catch {
+      alert('Error deleting category');
+    } finally {
+      setDeletingCatId(null);
+    }
+  };
 
   const [selectedDoc, setSelectedDoc] = useState<{ url: string; name: string } | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -701,6 +811,151 @@ export default function AdminTab({
       )}
 
       {section === 'chat_qa' && <AdminChatQaSection />}
+
+      {section === 'categories' && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-100 shadow-xs">
+            <div>
+              <h3 className="font-extrabold text-[#001D4A] text-base flex items-center gap-2">
+                <Tag className="w-4 h-4 text-emerald-600" />
+                Global Platform Categories
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Manage global categories available to all companies for component and RFQ classification.
+              </p>
+            </div>
+            <button
+              onClick={openAddCategoryModal}
+              className="py-2 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-xs shrink-0 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Category</span>
+            </button>
+          </div>
+
+          {loadingCategories ? (
+            <div className="flex items-center justify-center py-12 text-slate-400 gap-2">
+              <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />
+              <span className="text-xs">Loading global categories...</span>
+            </div>
+          ) : !categories || categories.length === 0 ? (
+            <div className="py-12 text-center bg-white rounded-2xl border border-slate-100 text-slate-400 text-xs">
+              No categories found. Click "Add Category" to create the first platform category.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {categories.map((cat: any) => (
+                <div key={cat.id} className="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs flex flex-col justify-between hover:border-slate-200 transition-all">
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                        GLOBAL
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => openEditCategoryModal(cat)}
+                          className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all cursor-pointer"
+                          title="Edit Category"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCategory(cat.id, cat.categoryName)}
+                          disabled={deletingCatId === cat.id}
+                          className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
+                          title="Delete Category"
+                        >
+                          {deletingCatId === cat.id ? <Loader2 className="w-3.5 h-3.5 animate-spin text-red-500" /> : <Trash2 className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                    <h4 className="font-bold text-sm text-[#001D4A]">{cat.categoryName}</h4>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      {cat.description || 'No description provided.'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add / Edit Category Modal */}
+          {showCatModal && (
+            <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+              <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-5 shadow-2xl">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shrink-0">
+                      <Tag className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-extrabold text-[#001D4A]">
+                        {editingCatId ? 'Edit Global Category' : 'Add Global Category'}
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {editingCatId ? 'Update category name and description across platform' : 'Common category accessible across all companies'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowCatModal(false)}
+                    className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-all cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveCategory} className="space-y-3.5 pt-3.5">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                      Category Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Mechanical, Fasteners, Electrical..."
+                      value={catName}
+                      onChange={(e) => setCatName(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-[#001D4A] placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-emerald-500 transition-all font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                      Description <span className="text-slate-400 font-normal">(optional)</span>
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Brief description of this component category..."
+                      value={catDesc}
+                      onChange={(e) => setCatDesc(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-[#001D4A] placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-emerald-500 transition-all font-medium resize-none"
+                    />
+                  </div>
+
+                  <div className="flex gap-2.5 pt-3 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setShowCatModal(false)}
+                      className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={savingCat}
+                      className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      {savingCat && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      <span>{savingCat ? 'Saving...' : editingCatId ? 'Update Category' : 'Save Global Category'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {viewInvoice && (
         <InvoiceDetailModal invoice={viewInvoice} onClose={() => setViewInvoice(null)} />

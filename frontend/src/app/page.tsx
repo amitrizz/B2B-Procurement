@@ -48,7 +48,7 @@ export default function Home() {
         const parsed = JSON.parse(storedUser);
         router.push(getDefaultRouteForRole(parsed.role));
       } catch {
-        router.push('/marketplace');
+        router.push('/dashboard/rfqs');
       }
     } else {
       setCheckingAuth(false);
@@ -318,8 +318,8 @@ export default function Home() {
           {/* Top Section */}
           <div className="pt-12 pb-8 px-6 text-white flex-none relative overflow-hidden">
             <div className="flex items-center gap-3 mb-6">
-              <div className="bg-white p-1.5 rounded-xl shadow-sm">
-                <img src="/logo.png" alt="Kantech" className="w-7 h-7 object-contain" />
+              <div className="bg-white p-1.5 rounded-xl shadow-sm overflow-hidden">
+                <img src="/logo.jpeg" alt="Kantech" className="w-7 h-7 object-contain rounded-lg" />
               </div>
               <div>
                 <h2 className="font-bold text-lg leading-tight">Kantech</h2>
@@ -431,8 +431,8 @@ export default function Home() {
           {/* Top Section */}
           <div className="pt-12 pb-8 px-6 text-white flex-none relative overflow-hidden">
              <div className="flex items-center gap-2 mb-8">
-                <div className="bg-white p-1.5 rounded-lg shadow-sm">
-                  <img src="/logo.png" alt="Kantech" className="w-6 h-6 object-contain" />
+                <div className="bg-white p-1.5 rounded-lg shadow-sm overflow-hidden">
+                  <img src="/logo.jpeg" alt="Kantech" className="w-6 h-6 object-contain rounded-md" />
                 </div>
                 <div>
                   <h2 className="font-bold text-lg leading-tight">Kantech</h2>
@@ -667,8 +667,8 @@ export default function Home() {
               <ChevronLeft className="w-6 h-6" />
             </button>
             <div className="flex items-center gap-2">
-              <div className="bg-white p-1 rounded-lg border border-gray-100 shadow-sm">
-                <img src="/logo.png" alt="Kantech" className="w-5 h-5 object-contain" />
+              <div className="bg-white p-1 rounded-lg border border-gray-100 shadow-sm overflow-hidden">
+                <img src="/logo.jpeg" alt="Kantech" className="w-5 h-5 object-contain rounded" />
               </div>
               <div>
                 <h2 className="font-bold text-sm leading-tight text-gray-900">Kantech</h2>

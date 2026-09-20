@@ -1,6 +1,6 @@
-import { RefreshCw, ArrowLeft, ChevronRight, Search, X, Loader2 } from 'lucide-react';
+import { RefreshCw, ArrowLeft, ChevronRight, Search, X, Loader2, Tag, Filter, Download, Box, FileText } from 'lucide-react';
 import styles from './marketplace.module.scss';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { RefreshButton } from '@/components/ui/RefreshButton';
 
 interface MarketplaceTabProps {
@@ -18,6 +18,7 @@ interface MarketplaceTabProps {
   setActiveTab: (tab: string) => void;
   setSelectedRfqForDetails: (rfq: any) => void;
   submittingActions?: Record<string, boolean>;
+  companyCategories?: any[];
 }
 
 export default function MarketplaceTab({
@@ -34,32 +35,47 @@ export default function MarketplaceTab({
   user,
   setActiveTab,
   setSelectedRfqForDetails,
-  submittingActions = {}
+  submittingActions = {},
+  companyCategories = []
 }: MarketplaceTabProps) {
   const [viewFileId, setViewFileId] = useState<string | null>(null);
+  const [fileMeta, setFileMeta] = useState<{ id: string; filename: string; isCad: boolean; isPdf: boolean; downloadUrl: string } | null>(null);
+  const [loadingFileMeta, setLoadingFileMeta] = useState(false);
   const [showNdaModal, setShowNdaModal] = useState<{fileId: string} | null>(null);
   const [acceptingNda, setAcceptingNda] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   const handleViewDrawing = async (fileId: string) => {
+    setViewFileId(fileId);
+    setLoadingFileMeta(true);
+    setFileMeta(null);
     try {
-      const res = await fetch(`/api/v1/upload/${fileId}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/v1/upload/${fileId}?info=true`, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.status === 403) {
         const text = await res.text();
         try {
           const data = JSON.parse(text);
           if (data.code === 'NDA_REQUIRED') {
+            setViewFileId(null);
             setShowNdaModal({ fileId });
             return;
           }
-        } catch(e) {
-          // not json
+        } catch(e) {}
+      }
+      if (res.ok) {
+        const d = await res.json();
+        if (d.success && d.data) {
+          setFileMeta(d.data);
         }
       }
-      setViewFileId(fileId);
     } catch (err) {
-      setViewFileId(fileId); // fallback
+      console.error('Failed to fetch drawing metadata', err);
+    } finally {
+      setLoadingFileMeta(false);
     }
   };
 
@@ -85,13 +101,64 @@ export default function MarketplaceTab({
     }
   };
 
-  const filteredRfqs = marketplaceRfqs.filter((rfq: any) => {
-    if (mode === 'buyer') {
-      return rfq.buyerCompanyId === user?.companyId;
-    } else {
-      return rfq.buyerCompanyId !== user?.companyId;
+  // Base scope based on Buyer vs Seller mode
+  const modeScopedRfqs = useMemo(() => {
+    return marketplaceRfqs.filter((rfq: any) => {
+      if (mode === 'buyer') {
+        return rfq.buyerCompanyId === user?.companyId;
+      } else {
+        return rfq.buyerCompanyId !== user?.companyId;
+      }
+    });
+  }, [marketplaceRfqs, mode, user?.companyId]);
+
+  // Aggregate all unique categories from global categories catalog + actual active RFQs
+  const availableCategories = useMemo(() => {
+    const map = new Map<string, string>(); // lowercase -> display name
+    if (companyCategories && Array.isArray(companyCategories)) {
+      companyCategories.forEach((c: any) => {
+        const name = (c.categoryName || c.name || '').trim();
+        if (name) map.set(name.toLowerCase(), name);
+      });
     }
-  });
+    modeScopedRfqs.forEach((rfq: any) => {
+      const name = (rfq.category || '').trim();
+      if (name && !map.has(name.toLowerCase())) {
+        map.set(name.toLowerCase(), name);
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.localeCompare(b));
+  }, [companyCategories, modeScopedRfqs]);
+
+  // Helper to count RFQs in a category
+  const getCategoryCount = (catName: string) => {
+    if (catName === 'ALL') return modeScopedRfqs.length;
+    return modeScopedRfqs.filter(
+      (rfq: any) => (rfq.category || '').trim().toLowerCase() === catName.toLowerCase()
+    ).length;
+  };
+
+  // Filtered RFQs matching category and optional keyword search
+  const filteredRfqs = useMemo(() => {
+    return modeScopedRfqs.filter((rfq: any) => {
+      if (selectedCategory !== 'ALL') {
+        const rfqCat = (rfq.category || '').trim().toLowerCase();
+        if (rfqCat !== selectedCategory.toLowerCase()) {
+          return false;
+        }
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchTitle = rfq.title?.toLowerCase().includes(q);
+        const matchRfqNumber = rfq.rfqNumber?.toLowerCase().includes(q);
+        const matchDesc = rfq.description?.toLowerCase().includes(q);
+        const matchCat = rfq.category?.toLowerCase().includes(q);
+        const matchItem = rfq.items?.some((it: any) => it.componentName?.toLowerCase().includes(q));
+        return matchTitle || matchRfqNumber || matchDesc || matchCat || matchItem;
+      }
+      return true;
+    });
+  }, [modeScopedRfqs, selectedCategory, searchQuery]);
 
   const handleManageRfq = async (rfq: any) => {
     try {
@@ -169,7 +236,22 @@ export default function MarketplaceTab({
                   <p className={styles['marketplace--text-10px-text-gray-500-mt-1']}>
                     Sourcing option: {item.materialOptionPreference === 'WITH_MATERIAL' ? 'With Material' : 'Without Material'}
                   </p>
-                  <p className={styles['marketplace--text-10px-text-gray-500-mt-1-1']}>Drawing: <button onClick={() => handleViewDrawing(item.drawingFileId)} className={styles['marketplace--underline-text-blue-600-font-bold']}>{item.drawingFileId}</button></p>
+                  <p className={styles['marketplace--text-10px-text-gray-500-mt-1-1']}>
+                    Drawing / CAD: <button 
+                      type="button"
+                      onClick={() => handleViewDrawing(item.drawingFileId)} 
+                      className="underline text-blue-600 font-bold hover:text-blue-800 transition-colors cursor-pointer inline-flex items-center gap-1 ml-1"
+                    >
+                      {item.drawingFileId?.toLowerCase().includes('.sldprt') ? (
+                        <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 text-[10px] font-extrabold inline-flex items-center gap-1">
+                          <Box className="w-3 h-3 text-emerald-600" />
+                          <span>SolidWorks (.sldprt)</span>
+                        </span>
+                      ) : (
+                        <span>📄 View / Download Specification</span>
+                      )}
+                    </button>
+                  </p>
                 </div>
                 <div className={styles['marketplace--space-y-4-1']}>
                   <div className={styles['marketplace--space-y-1']}>
@@ -261,12 +343,160 @@ export default function MarketplaceTab({
           </div>
         </div>
       ) : (
-        <div className={styles['marketplace--grid-mdgrid-cols-2-lggrid-cols-3']}>
-          {filteredRfqs.length === 0 ? (
-            <div className={styles['marketplace--col-span-full-py-12-text-center']}>
-              {mode === 'buyer' ? 'You have not published any requirements yet.' : 'No marketplace requirements open at the moment.'}
+        <div className="space-y-4">
+          {/* Category & Search Filtration Toolbar */}
+          <div className="space-y-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              {/* Search Bar */}
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by component, requirement title, or RFQ#..."
+                  className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-8 py-2 text-xs font-medium text-[#001D4A] placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all shadow-xs"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full"
+                    title="Clear search"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Requirement Count Stats */}
+              <div className="flex items-center gap-1.5 text-xs text-slate-500 px-1 shrink-0 font-medium">
+                <Filter className="w-3.5 h-3.5 text-slate-400" />
+                <span>
+                  Showing <strong className="text-[#001D4A] font-bold">{filteredRfqs.length}</strong> of {modeScopedRfqs.length}
+                </span>
+              </div>
             </div>
-          ) : (
+
+            {/* Category Filter Pills (Horizontal Scroll) */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 select-none text-xs scrollbar-none" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              {/* All Categories Pill */}
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('ALL')}
+                className={`shrink-0 px-3 py-1.5 rounded-full font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+                  selectedCategory === 'ALL'
+                    ? mode === 'buyer'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                <span>All Categories</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                  selectedCategory === 'ALL'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-slate-100 text-slate-600'
+                }`}>
+                  {modeScopedRfqs.length}
+                </span>
+              </button>
+
+              {/* Global Category Pills */}
+              {availableCategories.map((cat) => {
+                const count = getCategoryCount(cat);
+                const isActive = selectedCategory.toLowerCase() === cat.toLowerCase();
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setSelectedCategory(isActive ? 'ALL' : cat)}
+                    className={`shrink-0 px-3 py-1.5 rounded-full font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+                      isActive
+                        ? mode === 'buyer'
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'bg-emerald-600 text-white shadow-xs'
+                        : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>{cat}</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                      isActive
+                        ? 'bg-white/20 text-white'
+                        : count > 0 ? 'bg-slate-100 text-slate-700' : 'bg-slate-50 text-slate-400'
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Active Filter Pill & Clear Button */}
+            {(selectedCategory !== 'ALL' || searchQuery.trim()) && (
+              <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-1.5 text-xs text-slate-600">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-slate-500 text-[11px]">Filtered by:</span>
+                  {selectedCategory !== 'ALL' && (
+                    <span className="px-2 py-0.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-bold text-[11px] flex items-center gap-1">
+                      Category: <span className="text-emerald-700">{selectedCategory}</span>
+                      <button onClick={() => setSelectedCategory('ALL')} className="text-slate-400 hover:text-slate-700 ml-0.5">
+                        &times;
+                      </button>
+                    </span>
+                  )}
+                  {searchQuery.trim() && (
+                    <span className="px-2 py-0.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-bold text-[11px] flex items-center gap-1">
+                      Keyword: "{searchQuery}"
+                      <button onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-slate-700 ml-0.5">
+                        &times;
+                      </button>
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategory('ALL');
+                    setSearchQuery('');
+                  }}
+                  className="text-[11px] font-bold text-emerald-700 hover:underline cursor-pointer ml-2 shrink-0"
+                >
+                  Clear all
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className={styles['marketplace--grid-mdgrid-cols-2-lggrid-cols-3']}>
+            {filteredRfqs.length === 0 ? (
+              <div className="col-span-full py-12 text-center bg-white rounded-2xl border border-slate-100 p-6 shadow-xs">
+                <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-2.5">
+                  <Search className="w-5 h-5" />
+                </div>
+                <h3 className="font-bold text-slate-800 text-sm mb-1">
+                  {selectedCategory !== 'ALL' || searchQuery.trim()
+                    ? 'No matching requirements found'
+                    : mode === 'buyer' ? 'You have not published any requirements yet.' : 'No marketplace requirements open at the moment.'}
+                </h3>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto mb-3">
+                  {selectedCategory !== 'ALL' || searchQuery.trim()
+                    ? `No open requirements match the category "${selectedCategory}" or your search terms. Try clearing the filter.`
+                    : 'Check back soon for new open procurement RFQs from other companies.'}
+                </p>
+                {(selectedCategory !== 'ALL' || searchQuery.trim()) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategory('ALL');
+                      setSearchQuery('');
+                    }}
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-xs"
+                  >
+                    Show All Requirements
+                  </button>
+                )}
+              </div>
+            ) : (
             filteredRfqs.map((rfq: any) => (
               <div key={rfq.id} className={styles['marketplace--bg-white-rounded-2xl-p-5']}>
                 <div>
@@ -328,30 +558,86 @@ export default function MarketplaceTab({
               </div>
             ))
           )}
+          </div>
         </div>
       )}
 
-      {/* Document Viewer Modal */}
+      {/* Document & CAD Viewer Modal */}
       {viewFileId && (
-        <div className={styles['marketplace--fixed-inset-0-z-60']}>
-          <div className={styles['marketplace--bg-white-rounded-2xl-shadow-2xl']}>
-            <div className={styles['marketplace--p-4-border-b-border-gray-200']}>
-              <h3 className={styles['marketplace--text-sm-font-bold-text-001D4A']}>
-                Drawing Document
-              </h3>
-              <button 
-                onClick={() => setViewFileId(null)}
-                className={styles['marketplace--p-15-hoverbg-gray-200-rounded-lg']}
-              >
-                <X className={styles['marketplace--w-5-h-5']} />
-              </button>
+        <div className="fixed inset-0 z-60 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col border border-slate-200">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100 shrink-0">
+                  {fileMeta?.isCad ? <Box className="w-5 h-5 text-emerald-600" /> : <FileText className="w-5 h-5 text-blue-600" />}
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-extrabold text-[#001D4A] truncate">
+                    {fileMeta?.isCad ? '3D CAD Part Specification' : 'Drawing Document'}
+                  </h3>
+                  <p className="text-[11px] text-slate-400 truncate max-w-xs">
+                    {fileMeta?.filename || viewFileId}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <a
+                  href={`/api/v1/upload/${viewFileId}?download=true`}
+                  download={fileMeta?.filename || 'download'}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                  title="Download file to device"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download</span>
+                </a>
+                <button 
+                  onClick={() => { setViewFileId(null); setFileMeta(null); }}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
-            <div className={styles['marketplace--flex-1-bg-gray-100-p-4']}>
-              <iframe 
-                src={`/uploads/${viewFileId}`} 
-                className={styles['marketplace--w-full-h-full-rounded-xl']}
-                title="Drawing Viewer"
-              />
+
+            <div className="flex-1 bg-slate-50 p-4 min-h-[360px] flex flex-col justify-center">
+              {loadingFileMeta ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-2 text-slate-400">
+                  <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
+                  <span className="text-xs font-medium">Checking file format...</span>
+                </div>
+              ) : fileMeta?.isCad ? (
+                <div className="bg-white rounded-2xl border border-emerald-100 p-6 sm:p-8 flex flex-col items-center text-center shadow-xs">
+                  <div className="w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-xs mb-4">
+                    <Box className="w-8 h-8" />
+                  </div>
+                  <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 mb-2">
+                    {fileMeta.filename.toLowerCase().endsWith('.sldprt') ? 'SolidWorks Part (.sldprt)' : '3D CAD Model'}
+                  </span>
+                  <h4 className="font-bold text-base text-[#001D4A] mb-1">
+                    {fileMeta.filename}
+                  </h4>
+                  <p className="text-xs text-slate-500 max-w-md leading-relaxed mb-6">
+                    This component includes a high-precision 3D SolidWorks model. Download the file to open and inspect in SolidWorks, eDrawings Viewer, Fusion 360, or your CNC CAM software for exact quotation.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    <a
+                      href={`/api/v1/upload/${viewFileId}?download=true`}
+                      download={fileMeta.filename}
+                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Download SolidWorks Part ({fileMeta.filename})</span>
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <iframe 
+                  src={`/uploads/${viewFileId}`} 
+                  className="w-full h-[500px] rounded-xl border border-slate-200 bg-white"
+                  title="Drawing Viewer"
+                />
+              )}
             </div>
           </div>
         </div>

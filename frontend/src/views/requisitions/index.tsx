@@ -1139,18 +1139,11 @@ export default function RequisitionsTab({
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                    Category <span className="text-red-500">*</span>
+                    Global Category <span className="text-red-500">*</span>
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAddComponentModal(false);
-                      setShowAddCategoryModal(true);
-                    }}
-                    className="text-[10px] font-bold text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-0.5"
-                  >
-                    <Plus className="w-2.5 h-2.5" /> New Category
-                  </button>
+                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                    Platform Global
+                  </span>
                 </div>
                 <select
                   required
@@ -1158,7 +1151,7 @@ export default function RequisitionsTab({
                   onChange={(e) => setNewComponentCategory(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-[#001D4A] focus:bg-white focus:outline-none focus:border-blue-500 transition-all"
                 >
-                  <option value="" disabled>-- Select Category --</option>
+                  <option value="" disabled>-- Select Global Category --</option>
                   {allCategories.map((cat, idx) => (
                     <option key={idx} value={cat}>
                       {cat}
@@ -1169,7 +1162,7 @@ export default function RequisitionsTab({
                   )}
                 </select>
                 <p className="text-[10px] text-slate-400 mt-1">
-                  Selected from your company standard category catalog
+                  Selected from platform global category catalog
                 </p>
               </div>
 

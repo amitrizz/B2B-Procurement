@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { getAuthUser } from '@/lib/auth';
 import mongoose from 'mongoose';
+import fs from 'fs';
+import path from 'path';
 
 export async function GET(
   req: NextRequest,
@@ -179,13 +181,34 @@ export async function GET(
       }
     }
 
-    // Convert Base64 back to binary Buffer
-    const buffer = Buffer.from(fileRecord.data, 'base64');
+    // Retrieve binary buffer either from MongoDB Base64 or local disk storage
+    let buffer: Buffer | null = null;
+    if (fileRecord.data && fileRecord.data.length > 0) {
+      buffer = Buffer.from(fileRecord.data, 'base64');
+    } else {
+      const diskPath = path.join(process.cwd(), 'public', 'uploads', cleanId);
+      if (fs.existsSync(diskPath)) {
+        buffer = await fs.promises.readFile(diskPath);
+      }
+    }
 
-    return new Response(buffer, {
+    if (!buffer) {
+      return new Response('File content not available', { status: 404 });
+    }
+
+    const searchParams = req.nextUrl.searchParams;
+    const isDownload = searchParams.get('download') === 'true';
+    const isCad = ['.sldprt', '.step', '.stp', '.iges', '.igs', '.dxf', '.dwg', '.sldasm'].some(ext =>
+      fileRecord.filename?.toLowerCase().endsWith(ext)
+    );
+    const disposition = (isDownload || isCad)
+      ? `attachment; filename="${fileRecord.filename}"`
+      : `inline; filename="${fileRecord.filename}"`;
+
+    return new Response(new Uint8Array(buffer), {
       headers: {
-        'Content-Type': fileRecord.mimeType,
-        'Content-Disposition': `inline; filename="${fileRecord.filename}"`,
+        'Content-Type': fileRecord.mimeType || 'application/octet-stream',
+        'Content-Disposition': disposition,
         'Cache-Control': 'public, max-age=31536000, immutable',
       },
     });

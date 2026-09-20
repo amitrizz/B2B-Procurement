@@ -62,11 +62,15 @@ if (mongoose.models.CompanyComponent) {
 }
 export const CompanyComponent = mongoose.models.CompanyComponent || mongoose.model('CompanyComponent', CompanyComponentSchema);
 
-// CompanyCategory
+// CompanyCategory (Global / Platform-wide categories)
 const CompanyCategorySchema = new Schema({
-  companyId: { type: Schema.Types.ObjectId, ref: 'Company', required: true },
+  companyId: { type: Schema.Types.ObjectId, ref: 'Company', required: false },
   categoryName: { type: String, required: true },
-  description: { type: String }
+  description: { type: String },
+  isGlobal: { type: Boolean, default: true }
 }, { timestamps: true });
 
+if (mongoose.models.CompanyCategory) {
+  delete (mongoose.models as any).CompanyCategory;
+}
 export const CompanyCategory = mongoose.models.CompanyCategory || mongoose.model('CompanyCategory', CompanyCategorySchema);

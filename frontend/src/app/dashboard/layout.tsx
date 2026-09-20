@@ -49,12 +49,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const handleTabChange = (tab: string) => {
     if (!isTabAllowedForMode(tab, mode)) {
-      showToast('Purchase Requisitions are only accessible in Buyer mode', 'info');
+      if (mode === 'buyer') {
+        showToast('Public Marketplace is only accessible in Seller mode', 'info');
+      } else {
+        showToast('Purchase Requisitions are only accessible in Buyer mode', 'info');
+      }
       router.push(getDefaultRouteForMode(mode));
       return;
     }
     if (user && !isTabAllowedForRole(tab, user.role)) {
-      router.push(getDefaultRouteForRole(user.role));
+      router.push(getDefaultRouteForRole(user.role, mode));
       return;
     }
     router.push(getRouteForTab(tab));
@@ -127,6 +131,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (next === 'seller' && (activeTab === 'prs' || pathname.includes('/requisitions'))) {
       router.push('/dashboard/rfqs');
     }
+    if (next === 'buyer' && (activeTab === 'marketplace' || pathname.includes('/marketplace'))) {
+      router.push('/dashboard/rfqs');
+    }
   };
 
   useEffect(() => {
@@ -134,10 +141,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     setModeState(readDashboardMode(getCompanyIdFromUser(user)));
   }, [user?.id, companyId]);
 
-  // Mode Route Restriction Guard: Ensure seller cannot stay on buyer-only pages
+  // Mode Route Restriction Guard: Ensure seller cannot stay on buyer-only pages and buyer cannot stay on marketplace
   useEffect(() => {
     if (checkingAuth) return;
     if (mode === 'seller' && (activeTab === 'prs' || pathname.includes('/requisitions'))) {
+      router.replace('/dashboard/rfqs');
+    }
+    if (mode === 'buyer' && (activeTab === 'marketplace' || pathname.includes('/marketplace'))) {
       router.replace('/dashboard/rfqs');
     }
   }, [mode, activeTab, pathname, checkingAuth, router]);
@@ -186,7 +196,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       setImpersonatedCompany(company);
 
       showToast(`Now impersonating ${company.name}`, 'success');
-      router.push('/dashboard/marketplace');
+      const targetMode = readDashboardMode(company.id);
+      router.push(getDefaultRouteForRole(data.data.user?.role, targetMode));
     } catch (err: any) {
       showToast('Error starting impersonation', 'error');
     }
@@ -461,9 +472,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     if (!user || checkingAuth) return;
     if (!isTabAllowedForRole(activeTab, user.role)) {
-      router.replace(getDefaultRouteForRole(user.role));
+      router.replace(getDefaultRouteForRole(user.role, mode));
     }
-  }, [user, activeTab, checkingAuth, router]);
+  }, [user, activeTab, checkingAuth, router, mode]);
+
+  // Redirect naked /dashboard route based on current mode
+  useEffect(() => {
+    if (checkingAuth) return;
+    if (pathname === '/dashboard' || pathname === '/dashboard/') {
+      router.replace(mode === 'buyer' ? '/dashboard/rfqs' : '/dashboard/marketplace');
+    }
+  }, [pathname, mode, checkingAuth, router]);
 
   useEffect(() => {
     fetchDataRef.current = fetchData;
@@ -612,7 +631,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       const role = user?.role;
 
-      if (activeTab === 'marketplace' && role !== 'TRANSPORTER' && role !== 'FINANCE') {
+      if (activeTab === 'marketplace' && role !== 'TRANSPORTER' && role !== 'FINANCE' && mode !== 'buyer') {
         const res = await fetch(`/api/v1/marketplace/requirements?_t=${Date.now()}`, fetchOpts);
         const d = await res.json();
         if (d.success) setMarketplaceRfqs(d.data);
@@ -667,10 +686,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         const res = await fetch('/api/v1/company/components', { headers });
         const d = await res.json();
         if (d.success) setCompanyComponents(d.data);
+      }
 
-        const resCat = await fetch('/api/v1/company/categories', { headers });
+      if (role !== 'TRANSPORTER') {
+        const resCat = await fetch(`/api/v1/company/categories?_t=${Date.now()}`, fetchOpts);
         const dCat = await resCat.json();
-        if (dCat.success) setCompanyCategories(dCat.data);
+        if (dCat?.success) setCompanyCategories(dCat.data || []);
       }
 
       if (activeTab === 'catalog') {
@@ -953,8 +974,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (data.success) {
         const items = [...newRfqItems];
         items[idx].drawingFileId = data.data.filename;
+        items[idx].drawingOriginalName = data.data.originalName || file.name;
+        items[idx].isCad = data.data.isCad || file.name.toLowerCase().endsWith('.sldprt');
         setNewRfqItems(items);
-        showToast(`Drawing "${file.name}" uploaded successfully!`, 'success');
+        showToast(`${items[idx].isCad ? '3D CAD file' : 'Drawing'} "${file.name}" uploaded successfully!`, 'success');
       } else {
         showToast(data.message || 'File upload failed', 'error');
       }
@@ -1142,7 +1165,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="md:hidden bg-[#F8FAFC] px-4 py-3 flex flex-col space-y-4 z-40 shrink-0 pt-safe">
         <div className="flex items-center justify-between gap-2 min-w-0">
           <div className="flex items-center space-x-2 min-w-0 flex-1">
-            <img src="/logo.png" alt="Company Logo" className="w-8 h-8 shrink-0 object-cover" style={{ clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' }} />
+            <img src="/logo.jpeg" alt="Company Logo" className="w-8 h-8 shrink-0 object-cover rounded-lg shadow-xs border border-slate-200/60" />
             <span className="font-extrabold text-[13px] text-[#001D4A] uppercase tracking-wider min-w-0 truncate">
               {user?.company?.name || 'Company'}
             </span>
@@ -1218,7 +1241,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div>
           <div className="flex justify-between items-center mb-8">
             <div className="flex items-center space-x-3">
-              <img src="/logo.png" alt="Company Logo" className="w-8 h-8 shrink-0 object-cover" style={{ clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' }} />
+              <img src="/logo.jpeg" alt="Company Logo" className="w-8 h-8 shrink-0 object-cover rounded-lg shadow-xs border border-white/10" />
               <div>
                 <h2 className="font-extrabold text-sm tracking-tight text-white flex items-center gap-1.5">
                   {user.company?.name || 'Platform Admin'}
@@ -1240,13 +1263,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="space-y-1">
             {user.role !== 'TRANSPORTER' && (
               <>
-                <button
-                  onClick={() => handleTabChange('marketplace')}
-                  className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'marketplace' ? activeSidebarTabClass : 'text-slate-400 hover:text-white'}`}
-                >
-                  <Search className="w-4 h-4" />
-                  <span>Public Marketplace</span>
-                </button>
+                {!isBuyer && (
+                  <button
+                    onClick={() => handleTabChange('marketplace')}
+                    className={`w-full text-left py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center space-x-2.5 transition-all ${activeTab === 'marketplace' ? activeSidebarTabClass : 'text-slate-400 hover:text-white'}`}
+                  >
+                    <Search className="w-4 h-4" />
+                    <span>Public Marketplace</span>
+                  </button>
+                )}
 
                 <button
                   onClick={() => handleTabChange('catalog')}
@@ -1435,12 +1460,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Bottom Navigation Bar (Mobile) */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex justify-between items-center px-2 py-2 pb-safe z-50 shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.05)]">
-        {/* Tab 1: Market (Both) */}
-        <button onClick={() => handleTabChange('marketplace')} className={`flex flex-col items-center gap-0.5 flex-1 outline-none focus:outline-none focus:ring-0 select-none ${activeTab === 'marketplace' ? activeMobileTabClass : 'text-slate-400'}`}>
-          <Search className="w-5 h-5" />
-          <span className="text-[9px] font-semibold">Market</span>
-          {activeTab === 'marketplace' ? <div className={`w-5 h-0.5 ${activeMobileIndicatorClass} rounded-full mt-0.5`}></div> : <div className="w-5 h-0.5 bg-transparent mt-0.5"></div>}
-        </button>
+        {/* Tab 1: Market (Seller Only) */}
+        {!isBuyer && (
+          <button onClick={() => handleTabChange('marketplace')} className={`flex flex-col items-center gap-0.5 flex-1 outline-none focus:outline-none focus:ring-0 select-none ${activeTab === 'marketplace' ? activeMobileTabClass : 'text-slate-400'}`}>
+            <Search className="w-5 h-5" />
+            <span className="text-[9px] font-semibold">Market</span>
+            {activeTab === 'marketplace' ? <div className={`w-5 h-0.5 ${activeMobileIndicatorClass} rounded-full mt-0.5`}></div> : <div className="w-5 h-0.5 bg-transparent mt-0.5"></div>}
+          </button>
+        )}
 
         {/* Tab 2: PRs (Buyer Only - Purchase Requisitions) */}
         {isBuyer && (
@@ -1614,12 +1641,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] text-[var(--text-subtitle)] font-bold uppercase tracking-wider block">Drawing File <span className="text-red-500">*</span></label>
-                        <label className="cursor-pointer bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-center hover:bg-white hover:border-blue-500/30 transition-all text-[11px] font-semibold text-blue-400 block truncate max-w-full">
-                          {item.drawingFileId ? (item.drawingFileId.length > 15 ? item.drawingFileId.substring(0, 12) + '...' : item.drawingFileId) : 'Upload File'}
+                        <label className="text-[10px] text-[var(--text-subtitle)] font-bold uppercase tracking-wider block">Drawing / 3D CAD File <span className="text-red-500">*</span></label>
+                        <label className="cursor-pointer bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-center hover:bg-white hover:border-blue-500/30 transition-all text-[11px] font-semibold text-blue-500 block truncate max-w-full">
+                          {item.drawingFileId ? (
+                            <span className="flex items-center justify-center gap-1">
+                              {item.isCad || item.drawingOriginalName?.toLowerCase().endsWith('.sldprt') ? (
+                                <span className="text-emerald-600 font-bold truncate">📦 {item.drawingOriginalName || 'SolidWorks (.sldprt)'}</span>
+                              ) : (
+                                <span className="truncate">📄 {item.drawingOriginalName || (item.drawingFileId.length > 15 ? item.drawingFileId.substring(0, 12) + '...' : item.drawingFileId)}</span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">📎 Upload (.pdf, .sldprt, .step)</span>
+                          )}
                           <input
                             type="file"
-                            accept=".pdf,image/*"
+                            accept=".pdf,.png,.jpg,.jpeg,.sldprt,.step,.stp,.iges,.igs,.dxf,.dwg,.sldasm"
                             onChange={(e) => handleFileUpload(e, idx)}
                             className="hidden"
                           />
