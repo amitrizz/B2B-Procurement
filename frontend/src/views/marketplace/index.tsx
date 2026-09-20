@@ -1,6 +1,6 @@
-import { RefreshCw, ArrowLeft, ChevronRight, Search, X, Loader2, Tag, Filter, Download, Box, FileText } from 'lucide-react';
+import { RefreshCw, ArrowLeft, ChevronRight, Search, X, Loader2, Tag, Filter, Download, Box, FileText, ChevronDown, Check } from 'lucide-react';
 import styles from './marketplace.module.scss';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { RefreshButton } from '@/components/ui/RefreshButton';
 
 interface MarketplaceTabProps {
@@ -43,7 +43,35 @@ export default function MarketplaceTab({
   const [loadingFileMeta, setLoadingFileMeta] = useState(false);
   const [showNdaModal, setShowNdaModal] = useState<{fileId: string} | null>(null);
   const [acceptingNda, setAcceptingNda] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+
+  // Category filter state initialized from localStorage for persistence across refreshes
+  const [selectedCategory, setSelectedCategory] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('kantech_marketplace_category') || 'ALL';
+    }
+    return 'ALL';
+  });
+  const [isCatDropdownOpen, setIsCatDropdownOpen] = useState(false);
+  const catDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (catDropdownRef.current && !catDropdownRef.current.contains(event.target as Node)) {
+        setIsCatDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelectCategory = (cat: string) => {
+    setSelectedCategory(cat);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('kantech_marketplace_category', cat);
+    }
+    setIsCatDropdownOpen(false);
+  };
+
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const handleViewDrawing = async (fileId: string) => {
@@ -346,7 +374,7 @@ export default function MarketplaceTab({
         <div className="space-y-4">
           {/* Category & Search Filtration Toolbar */}
           <div className="space-y-2.5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
               {/* Search Bar */}
               <div className="relative flex-1">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -354,13 +382,14 @@ export default function MarketplaceTab({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by component, requirement title, or RFQ#..."
-                  className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-8 py-2 text-xs font-medium text-[#001D4A] placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all shadow-xs"
+                  placeholder="Search by component, title, or RFQ#..."
+                  className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-8 py-2.5 text-xs font-medium text-[#001D4A] placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 transition-all shadow-2xs"
                 />
                 {searchQuery && (
                   <button
+                    type="button"
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-full cursor-pointer"
                     title="Clear search"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -368,103 +397,169 @@ export default function MarketplaceTab({
                 )}
               </div>
 
-              {/* Requirement Count Stats */}
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 px-1 shrink-0 font-medium">
-                <Filter className="w-3.5 h-3.5 text-slate-400" />
-                <span>
-                  Showing <strong className="text-[#001D4A] font-bold">{filteredRfqs.length}</strong> of {modeScopedRfqs.length}
-                </span>
+              {/* Styled Category Dropdown Menu */}
+              <div className="relative shrink-0 sm:min-w-[240px]" ref={catDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsCatDropdownOpen(!isCatDropdownOpen)}
+                  className={`w-full bg-white border rounded-xl px-3.5 py-2.5 text-xs font-medium flex items-center justify-between gap-2.5 shadow-2xs transition-all cursor-pointer ${
+                    isCatDropdownOpen
+                      ? 'border-emerald-500 ring-2 ring-emerald-500/15 shadow-sm'
+                      : selectedCategory !== 'ALL'
+                        ? 'border-emerald-300 bg-emerald-50/20 hover:bg-emerald-50/40'
+                        : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Tag className={`w-3.5 h-3.5 shrink-0 ${selectedCategory !== 'ALL' ? 'text-emerald-600' : 'text-slate-400'}`} />
+                    <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider shrink-0">Category:</span>
+                    <span className="font-extrabold text-xs text-[#001D4A] truncate max-w-[130px] sm:max-w-[150px]">
+                      {selectedCategory === 'ALL' ? 'All Categories' : selectedCategory}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                      selectedCategory !== 'ALL'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {selectedCategory === 'ALL' ? modeScopedRfqs.length : getCategoryCount(selectedCategory)}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isCatDropdownOpen ? 'rotate-180 text-emerald-600' : ''}`} />
+                  </div>
+                </button>
+
+                {/* Dropdown Menu Popup with rich CSS */}
+                {isCatDropdownOpen && (
+                  <div className="absolute left-0 right-0 sm:right-auto sm:w-80 mt-1.5 z-40 bg-white border border-slate-200/90 rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                    {/* Menu Header */}
+                    <div className="px-3.5 py-2.5 bg-slate-50/90 border-b border-slate-100 flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      <span className="flex items-center gap-1.5 text-slate-600">
+                        <Filter className="w-3 h-3 text-emerald-600" />
+                        Select Category
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-semibold">{availableCategories.length + 1} Total</span>
+                    </div>
+
+                    {/* Scrollable Categories List */}
+                    <div className="max-h-64 overflow-y-auto p-1.5 space-y-0.5">
+                      {/* All Categories Option */}
+                      <button
+                        type="button"
+                        onClick={() => handleSelectCategory('ALL')}
+                        className={`w-full px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-all cursor-pointer ${
+                          selectedCategory === 'ALL'
+                            ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-100/80 shadow-2xs'
+                            : 'text-slate-700 hover:bg-slate-50 font-medium'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          {selectedCategory === 'ALL' ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          ) : (
+                            <span className="w-3.5 h-3.5 shrink-0" />
+                          )}
+                          <span className="truncate">All Categories</span>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                          selectedCategory === 'ALL' ? 'bg-emerald-200/70 text-emerald-900' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {modeScopedRfqs.length}
+                        </span>
+                      </button>
+
+                      {/* Global Categories */}
+                      {availableCategories.map((cat) => {
+                        const count = getCategoryCount(cat);
+                        const isSelected = selectedCategory.toLowerCase() === cat.toLowerCase();
+                        return (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => handleSelectCategory(cat)}
+                            className={`w-full px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-100/80 shadow-2xs'
+                                : 'text-slate-700 hover:bg-slate-50 font-medium'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              {isSelected ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              ) : (
+                                <span className="w-3.5 h-3.5 shrink-0" />
+                              )}
+                              <span className="truncate">{cat}</span>
+                            </div>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                              isSelected
+                                ? 'bg-emerald-200/70 text-emerald-900'
+                                : count > 0 ? 'bg-slate-100 text-slate-700' : 'bg-slate-50 text-slate-400'
+                            }`}>
+                              {count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Category Filter Pills (Horizontal Scroll) */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 select-none text-xs scrollbar-none" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-              {/* All Categories Pill */}
-              <button
-                type="button"
-                onClick={() => setSelectedCategory('ALL')}
-                className={`shrink-0 px-3 py-1.5 rounded-full font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
-                  selectedCategory === 'ALL'
-                    ? mode === 'buyer'
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'bg-emerald-600 text-white shadow-xs'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                }`}
-              >
-                <span>All Categories</span>
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
-                  selectedCategory === 'ALL'
-                    ? 'bg-white/20 text-white'
-                    : 'bg-slate-100 text-slate-600'
-                }`}>
-                  {modeScopedRfqs.length}
-                </span>
-              </button>
-
-              {/* Global Category Pills */}
-              {availableCategories.map((cat) => {
-                const count = getCategoryCount(cat);
-                const isActive = selectedCategory.toLowerCase() === cat.toLowerCase();
-                return (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setSelectedCategory(isActive ? 'ALL' : cat)}
-                    className={`shrink-0 px-3 py-1.5 rounded-full font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
-                      isActive
-                        ? mode === 'buyer'
-                          ? 'bg-blue-600 text-white shadow-xs'
-                          : 'bg-emerald-600 text-white shadow-xs'
-                        : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                    }`}
-                  >
-                    <span>{cat}</span>
-                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
-                      isActive
-                        ? 'bg-white/20 text-white'
-                        : count > 0 ? 'bg-slate-100 text-slate-700' : 'bg-slate-50 text-slate-400'
-                    }`}>
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Active Filter Pill & Clear Button */}
-            {(selectedCategory !== 'ALL' || searchQuery.trim()) && (
-              <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-1.5 text-xs text-slate-600">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold text-slate-500 text-[11px]">Filtered by:</span>
-                  {selectedCategory !== 'ALL' && (
-                    <span className="px-2 py-0.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-bold text-[11px] flex items-center gap-1">
-                      Category: <span className="text-emerald-700">{selectedCategory}</span>
-                      <button onClick={() => setSelectedCategory('ALL')} className="text-slate-400 hover:text-slate-700 ml-0.5">
-                        &times;
-                      </button>
-                    </span>
-                  )}
-                  {searchQuery.trim() && (
-                    <span className="px-2 py-0.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-bold text-[11px] flex items-center gap-1">
-                      Keyword: "{searchQuery}"
-                      <button onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-slate-700 ml-0.5">
-                        &times;
-                      </button>
-                    </span>
-                  )}
+            {/* Filter Stats & Active Filter Chips */}
+            <div className="flex items-center justify-between flex-wrap gap-2 text-xs pt-0.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 text-slate-500 font-medium">
+                  <Filter className="w-3.5 h-3.5 text-slate-400" />
+                  <span>
+                    Showing <strong className="text-[#001D4A] font-bold">{filteredRfqs.length}</strong> of {modeScopedRfqs.length} requirements
+                  </span>
                 </div>
+
+                {selectedCategory !== 'ALL' && (
+                  <span className="px-2.5 py-0.5 bg-emerald-50 border border-emerald-200/80 rounded-lg text-emerald-800 font-bold text-[11px] flex items-center gap-1 shadow-2xs">
+                    <span>{selectedCategory}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectCategory('ALL')}
+                      className="text-emerald-500 hover:text-emerald-800 ml-0.5 cursor-pointer font-bold"
+                      title="Remove category filter"
+                    >
+                      &times;
+                    </button>
+                  </span>
+                )}
+
+                {searchQuery.trim() && (
+                  <span className="px-2.5 py-0.5 bg-blue-50 border border-blue-200/80 rounded-lg text-blue-800 font-bold text-[11px] flex items-center gap-1 shadow-2xs">
+                    <span>"{searchQuery}"</span>
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="text-blue-500 hover:text-blue-800 ml-0.5 cursor-pointer font-bold"
+                      title="Clear search keyword"
+                    >
+                      &times;
+                    </button>
+                  </span>
+                )}
+              </div>
+
+              {(selectedCategory !== 'ALL' || searchQuery.trim()) && (
                 <button
                   type="button"
                   onClick={() => {
-                    setSelectedCategory('ALL');
+                    handleSelectCategory('ALL');
                     setSearchQuery('');
                   }}
-                  className="text-[11px] font-bold text-emerald-700 hover:underline cursor-pointer ml-2 shrink-0"
+                  className="text-[11px] font-bold text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
                 >
-                  Clear all
+                  Clear all filters
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           <div className={styles['marketplace--grid-mdgrid-cols-2-lggrid-cols-3']}>
@@ -487,7 +582,7 @@ export default function MarketplaceTab({
                   <button
                     type="button"
                     onClick={() => {
-                      setSelectedCategory('ALL');
+                      handleSelectCategory('ALL');
                       setSearchQuery('');
                     }}
                     className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-xs"
