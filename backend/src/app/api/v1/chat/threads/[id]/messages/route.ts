@@ -55,7 +55,7 @@ export async function GET(
       );
     }
 
-    if (!isThreadParticipant(user!.companyId, thread)) {
+    if (user!.role !== 'PLATFORM_ADMIN' && !isThreadParticipant(user!.companyId, thread)) {
       return NextResponse.json(
         { success: false, code: 'FORBIDDEN', message: 'Not a participant on this thread' },
         { status: 403 }
@@ -71,7 +71,7 @@ export async function GET(
       .populate('senderUserId', 'name')
       .lean();
 
-    const data = messages.map((m: any) => serializeMessage(m, user!.companyId));
+    const data = messages.map((m: any) => serializeMessage(m, user!.companyId || ''));
 
     return NextResponse.json({ success: true, data });
   } catch (error: any) {

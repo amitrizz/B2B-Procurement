@@ -138,6 +138,9 @@ export default function CompanyChatTab({
   const showToastRef = useRef(showToast);
   showToastRef.current = showToast;
 
+  const currentUser = user || (typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || 'null') : null);
+  const isAdmin = currentUser?.role === 'PLATFORM_ADMIN';
+
   const authHeaders = () => ({
     Authorization: `Bearer ${localStorage.getItem('token')}`,
     'Content-Type': 'application/json',
@@ -190,12 +193,14 @@ export default function CompanyChatTab({
 
   const activeThread = threads.find((t) => t.id === activeThreadId) ?? null;
 
-  // Separate Buyer vs Seller chats automatically based on header mode
-  const currentRoleThreads = threads.filter((t) =>
-    isSupplier
-      ? t.supplierCompany?.id === myCompanyId
-      : t.buyerCompany?.id === myCompanyId
-  );
+  // Separate Buyer vs Seller chats automatically based on header mode (admins see all)
+  const currentRoleThreads = isAdmin
+    ? threads
+    : threads.filter((t) =>
+        isSupplier
+          ? t.supplierCompany?.id === myCompanyId
+          : t.buyerCompany?.id === myCompanyId
+      );
 
   // Filter with search query
   const searchedThreads = currentRoleThreads.filter((t) => {
@@ -203,6 +208,8 @@ export default function CompanyChatTab({
     const q = searchQuery.toLowerCase();
     return (
       t.counterpartyCompany?.name?.toLowerCase().includes(q) ||
+      t.buyerCompany?.name?.toLowerCase().includes(q) ||
+      t.supplierCompany?.name?.toLowerCase().includes(q) ||
       t.poNumber?.toLowerCase().includes(q) ||
       t.lastMessagePreview?.toLowerCase().includes(q) ||
       t.purposeLabel?.toLowerCase().includes(q)
@@ -510,22 +517,33 @@ export default function CompanyChatTab({
         {/* Header with Title & Subtitle */}
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-[#001D4A]">
-              Chat
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-extrabold tracking-tight text-[#001D4A]">
+                {isAdmin ? 'All Platform Conversations' : 'Chat'}
+              </h1>
+              {isAdmin && (
+                <span className="px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                  Supervision Mode
+                </span>
+              )}
+            </div>
             <p className="text-xs text-slate-500 mt-1">
-              Connect with your team and get updates on your activities.
+              {isAdmin
+                ? 'Supervise and view all chat communications and order status threads between buyers and sellers.'
+                : 'Connect with your team and get updates on your activities.'}
             </p>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={openNewChatModal}
-              className={`cursor-pointer py-2 px-3.5 rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] text-white shadow-md ${themeButtonClass}`}
-            >
-              <Plus className="w-4 h-4" /> New Chat
-            </button>
+            {!isAdmin && (
+              <button
+                type="button"
+                onClick={openNewChatModal}
+                className={`cursor-pointer py-2 px-3.5 rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] text-white shadow-md ${themeButtonClass}`}
+              >
+                <Plus className="w-4 h-4" /> New Chat
+              </button>
+            )}
             <button
               type="button"
               onClick={() => loadThreads()}
@@ -600,7 +618,11 @@ export default function CompanyChatTab({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <h3 className="text-sm font-bold text-[#001D4A] truncate">
-                        {thread.counterpartyCompany?.name || 'Company'}
+                        {isAdmin
+                          ? (thread.buyerCompany?.name && thread.supplierCompany?.name
+                              ? `${thread.buyerCompany.name} ↔ ${thread.supplierCompany.name}`
+                              : thread.counterpartyCompany?.name || 'Buyer ↔ Supplier')
+                          : (thread.counterpartyCompany?.name || 'Company')}
                       </h3>
                       <span className="text-[10px] text-slate-400 font-medium shrink-0">
                         {timeStr}
@@ -664,11 +686,23 @@ export default function CompanyChatTab({
           </button>
           <div className="min-w-0">
             <h2 className="font-extrabold text-sm text-[#001D4A] truncate">
-              {activeThread.counterpartyCompany?.name || 'Company Chat'}
+              {isAdmin
+                ? (activeThread.buyerCompany?.name && activeThread.supplierCompany?.name
+                    ? `${activeThread.buyerCompany.name} ↔ ${activeThread.supplierCompany.name}`
+                    : activeThread.counterpartyCompany?.name || 'Buyer ↔ Supplier')
+                : (activeThread.counterpartyCompany?.name || 'Company Chat')}
             </h2>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-              <span className="text-[11px] text-emerald-600 font-medium">Active now</span>
+              {isAdmin ? (
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 uppercase">
+                  Supervision Mode
+                </span>
+              ) : (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                  <span className="text-[11px] text-emerald-600 font-medium">Active now</span>
+                </>
+              )}
               {activeThread.poNumber && (
                 <span className="text-[10px] text-blue-500 font-mono ml-1">• {activeThread.poNumber}</span>
               )}
@@ -738,6 +772,11 @@ export default function CompanyChatTab({
             // Incoming Received Message
             return (
               <div key={msg.id} className="flex flex-col items-start">
+                {isAdmin && (
+                  <span className="text-[10px] font-bold text-slate-500 mb-0.5 ml-9 flex items-center gap-1">
+                    <span>{msg.senderCompanyName || 'Participant'}</span>
+                  </span>
+                )}
                 <div className="flex items-end gap-2 max-w-[85%] sm:max-w-[75%]">
                   <div className="w-7 h-7 rounded-full bg-sky-100 text-sky-600 font-bold text-xs flex items-center justify-center shrink-0 mb-1 shadow-2xs">
                     {counterpartyInitial}
@@ -757,6 +796,20 @@ export default function CompanyChatTab({
       </div>
 
       {/* 5. Bottom Interactive Input Bar */}
+      {isAdmin ? (
+        <div className="p-3.5 bg-white border-t border-slate-200/80 flex items-center justify-between text-xs text-slate-500 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse"></span>
+            <span className="font-bold text-slate-800">Platform Admin Supervision</span>
+            <span className="text-slate-400 hidden sm:inline">• Read-only moderation mode</span>
+          </div>
+          {activeThread.poNumber && (
+            <span className="text-[11px] text-blue-600 font-mono bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-lg font-bold">
+              PO: {activeThread.poNumber}
+            </span>
+          )}
+        </div>
+      ) : (
       <div className="p-3 bg-white border-t border-slate-100 relative">
         {/* Custom Styled Question Popover (opens upward above input bar) */}
         {showQuestionSelector && templates.length > 0 && (
@@ -918,6 +971,7 @@ export default function CompanyChatTab({
           </p>
         )}
       </div>
+      )}
 
       {/* Repeat PO Modal */}
       {showRepeatPoModal && activeThreadId && (

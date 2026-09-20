@@ -22,6 +22,7 @@ import {
   Pencil,
 } from 'lucide-react';
 import AdminChatQaSection from '../chat/components/AdminChatQaSection';
+import CompanyDetailModal from './components/CompanyDetailModal';
 
 type AdminSection = 'verification' | 'escrow' | 'invoices' | 'users' | 'samples' | 'chat_qa' | 'categories';
 
@@ -80,6 +81,7 @@ export default function AdminTab({
   const [savingCat, setSavingCat] = useState(false);
   const [deletingCatId, setDeletingCatId] = useState<string | null>(null);
   const [loadingSection, setLoadingSection] = useState(false);
+  const [selectedDetailCompanyId, setSelectedDetailCompanyId] = useState<string | null>(null);
 
   const payments = internalPayments !== null ? internalPayments : (adminPayments || []);
   const users = internalUsers !== null ? internalUsers : (adminUsers || []);
@@ -388,6 +390,17 @@ export default function AdminTab({
                     </p>
                   </div>
                   <div className={styles['admin--flex-gap-2']}>
+                    {/* View Complete Details Button */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDetailCompanyId(c.id)}
+                      className="py-1.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-2xs cursor-pointer"
+                      title={`View complete profile and verification details of ${c.name}`}
+                    >
+                      <Building className="w-3.5 h-3.5 text-blue-600" />
+                      <span>View Complete Details</span>
+                    </button>
+
                     {/* Impersonate Company Button */}
                     <button
                       type="button"
@@ -959,6 +972,16 @@ export default function AdminTab({
 
       {viewInvoice && (
         <InvoiceDetailModal invoice={viewInvoice} onClose={() => setViewInvoice(null)} />
+      )}
+
+      {selectedDetailCompanyId && (
+        <CompanyDetailModal
+          companyId={selectedDetailCompanyId}
+          onClose={() => setSelectedDetailCompanyId(null)}
+          onImpersonate={handleImpersonateCompany}
+          onToggleActive={handleToggleActive}
+          onVerifyCompany={handleVerifyCompany}
+        />
       )}
 
       {selectedDoc && (

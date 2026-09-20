@@ -23,7 +23,7 @@ export function isTabAllowedForRole(tab: string, role?: string | null): boolean 
   if (!role || role === 'OWNER' || role === 'PROCUREMENT') return true;
 
   if (role === 'PLATFORM_ADMIN') {
-    return ['admin', 'admin_users', 'transporter', 'marketplace', 'orders', 'profile'].includes(tab);
+    return ['admin', 'admin_users', 'transporter', 'marketplace', 'orders', 'profile', 'company_chat', 'my_rfqs', 'prs'].includes(tab);
   }
 
   if (role === 'TRANSPORTER') {

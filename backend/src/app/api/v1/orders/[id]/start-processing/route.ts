@@ -10,7 +10,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     console.log(`[API] ${req.method} ${req.nextUrl?.pathname || req.url}`);
   try {
     const user = await getAuthUser(req);
-    if (!user || !user.companyId) return authErrorResponse();
+    if (!user || (!user.companyId && user.role !== 'PLATFORM_ADMIN')) return authErrorResponse();
 
     const { id } = await params;
     const { workImageId } = await req.json();
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
-    if (order.supplierCompanyId.toString() !== user.companyId) {
+    if (order.supplierCompanyId.toString() !== user.companyId && user.role !== 'PLATFORM_ADMIN') {
       return console.log(`[API Response] /api/v1/orders/[id]/start-processing - Sending response`), NextResponse.json(
         { success: false, code: 'FORBIDDEN', message: 'Only the supplier can start processing' },
         { status: 403 }

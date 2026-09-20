@@ -10,7 +10,7 @@ export async function POST(
     console.log(`[API] ${req.method} ${req.nextUrl?.pathname || req.url}`);
   try {
     const user = await getAuthUser(req);
-    if (!user || !user.companyId) return authErrorResponse();
+    if (!user || (!user.companyId && user.role !== 'PLATFORM_ADMIN')) return authErrorResponse();
 
     const { id } = await params;
     const body = await req.json(); // Accept partial updates like paymentTermsDays, escrowRequired, or items
@@ -24,7 +24,7 @@ export async function POST(
        return console.log(`[API Response] /api/v1/orders/[id]/amend - Sending response`), NextResponse.json({ success: false, code: 'NOT_FOUND', message: 'Order not found' }, { status: 404 });
     }
 
-    if (order.buyerCompanyId.toString() !== user.companyId) {
+    if (order.buyerCompanyId.toString() !== user.companyId && user.role !== 'PLATFORM_ADMIN') {
        return console.log(`[API Response] /api/v1/orders/[id]/amend - Sending response`), NextResponse.json({ success: false, code: 'FORBIDDEN', message: 'Only buyer can amend PO' }, { status: 403 });
     }
 

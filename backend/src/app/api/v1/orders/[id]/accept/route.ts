@@ -6,7 +6,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     console.log(`[API] ${req.method} ${req.nextUrl?.pathname || req.url}`);
   try {
     const user = await getAuthUser(req);
-    if (!user || !user.companyId) return authErrorResponse();
+    if (!user || (!user.companyId && user.role !== 'PLATFORM_ADMIN')) return authErrorResponse();
 
     const { id } = await params;
 
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return console.log(`[API Response] /api/v1/orders/[id]/accept - Sending response`), NextResponse.json({ success: false, code: 'NOT_FOUND', message: 'PO not found' }, { status: 404 });
     }
 
-    if (po.supplierCompanyId.toString() !== user.companyId) {
+    if (po.supplierCompanyId.toString() !== user.companyId && user.role !== 'PLATFORM_ADMIN') {
       return console.log(`[API Response] /api/v1/orders/[id]/accept - Sending response`), NextResponse.json({ success: false, code: 'FORBIDDEN', message: 'You are not the supplier for this PO' }, { status: 403 });
     }
 

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 import { CHAT_PURPOSE_LABELS } from '@/lib/chatTemplates';
 
-const BLOCKED_ROLES = new Set(['TRANSPORTER', 'PLATFORM_ADMIN']);
+const BLOCKED_ROLES = new Set(['TRANSPORTER']);
 
 export function chatAuthError(user: any) {
   if (!user) {
@@ -10,6 +10,10 @@ export function chatAuthError(user: any) {
       { success: false, code: 'UNAUTHORIZED', message: 'Unauthorized' },
       { status: 401 }
     );
+  }
+  // Platform admins have supervisory access
+  if (user.role === 'PLATFORM_ADMIN') {
+    return null;
   }
   if (!user.companyId) {
     return NextResponse.json(
@@ -56,7 +60,12 @@ export function serializeThread(thread: any, myCompanyId: string) {
   const counterparty =
     myCompanyId === buyerId
       ? thread.supplierCompanyId
-      : thread.buyerCompanyId;
+      : (myCompanyId === supplierId ? thread.buyerCompanyId : null);
+
+  const fallbackCounterpartyName =
+    thread.buyerCompanyId?.name && thread.supplierCompanyId?.name
+      ? `${thread.buyerCompanyId.name} ↔ ${thread.supplierCompanyId.name}`
+      : (thread.buyerCompanyId?.name || thread.supplierCompanyId?.name || 'Buyer ↔ Supplier');
 
   return {
     id: thread._id.toString(),
@@ -74,11 +83,8 @@ export function serializeThread(thread: any, myCompanyId: string) {
     counterpartyCompany: counterparty?.name
       ? { id: counterparty._id?.toString?.() ?? counterparty.id, name: counterparty.name }
       : {
-          id:
-            myCompanyId === buyerId
-              ? supplierId
-              : buyerId,
-          name: null,
+          id: supplierId || buyerId,
+          name: fallbackCounterpartyName,
         },
     lastMessageAt: thread.lastMessageAt,
     lastMessagePreview: thread.lastMessagePreview || '',

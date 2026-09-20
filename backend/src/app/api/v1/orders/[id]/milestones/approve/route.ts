@@ -9,7 +9,7 @@ export async function POST(
     console.log(`[API] ${req.method} ${req.nextUrl?.pathname || req.url}`);
   try {
     const user = await getAuthUser(req);
-    if (!user || !user.companyId) return authErrorResponse();
+    if (!user || (!user.companyId && user.role !== 'PLATFORM_ADMIN')) return authErrorResponse();
 
     const { id } = await params;
     const { stage } = await req.json();
@@ -28,7 +28,7 @@ export async function POST(
     }
 
     // Only buyer can approve
-    if (order.buyerCompanyId.toString() !== user.companyId) {
+    if (order.buyerCompanyId.toString() !== user.companyId && user.role !== 'PLATFORM_ADMIN') {
       return console.log(`[API Response] /api/v1/orders/[id]/milestones/approve - Sending response`), NextResponse.json({ success: false, code: 'FORBIDDEN', message: 'Only buyer can approve milestones' }, { status: 403 });
     }
 

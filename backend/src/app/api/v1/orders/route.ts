@@ -8,10 +8,10 @@ export async function GET(req: NextRequest) {
     console.log(`[API] ${req.method} ${req.nextUrl?.pathname || req.url}`);
   try {
     const user = await getAuthUser(req);
-    if (!user || !user.companyId) return authErrorResponse();
+    if (!user || (!user.companyId && user.role !== 'PLATFORM_ADMIN')) return authErrorResponse();
 
     const searchParams = req.nextUrl.searchParams;
-    const type = searchParams.get('type') || 'buying'; // buying or selling
+    const type = searchParams.get('type') || (user.role === 'PLATFORM_ADMIN' ? 'all' : 'buying'); // buying, selling, or all
 
     await db();
     const { PurchaseOrder } = await import('@/models/PurchaseOrder');
@@ -19,10 +19,27 @@ export async function GET(req: NextRequest) {
     await import('@/models/RFQ');
 
     const matchClause: any = {};
-    if (type === 'buying') {
-      matchClause.buyerCompanyId = new mongoose.Types.ObjectId(user.companyId);
+    const isAdmin = user.role === 'PLATFORM_ADMIN';
+
+    if (isAdmin) {
+      if (type === 'buying') {
+        const buyerCompanyId = searchParams.get('buyerCompanyId');
+        if (buyerCompanyId) {
+          matchClause.buyerCompanyId = new mongoose.Types.ObjectId(buyerCompanyId);
+        }
+      } else if (type === 'selling') {
+        const supplierCompanyId = searchParams.get('supplierCompanyId');
+        if (supplierCompanyId) {
+          matchClause.supplierCompanyId = new mongoose.Types.ObjectId(supplierCompanyId);
+        }
+      }
+      // If type === 'all', matchClause is empty to return all platform orders
     } else {
-      matchClause.supplierCompanyId = new mongoose.Types.ObjectId(user.companyId);
+      if (type === 'buying') {
+        matchClause.buyerCompanyId = new mongoose.Types.ObjectId(user.companyId);
+      } else {
+        matchClause.supplierCompanyId = new mongoose.Types.ObjectId(user.companyId);
+      }
     }
 
     const ordersDoc = await PurchaseOrder.aggregate([
@@ -126,8 +143,11 @@ export async function GET(req: NextRequest) {
           return {
             ...o,
             id: o._id.toString(),
-            buyerCompany: o.buyerCompany ? { name: o.buyerCompany.name } : null,
-            supplierCompany: o.supplierCompany ? { name: o.supplierCompany.name } : null,
+            buyerCompany: o.buyerCompany ? { id: o.buyerCompany._id?.toString(), name: o.buyerCompany.name } : null,
+            supplierCompany: o.supplierCompany ? { id: o.supplierCompany._id?.toString(), name: o.supplierCompany.name } : null,
+            flowType: isAdmin
+              ? (type === 'buying' ? 'Buying' : (type === 'selling' ? 'Selling' : 'All'))
+              : (type === 'buying' ? 'Buying' : 'Selling'),
             items,
             buyerTotal: pricing.buyerTotal,
             goodsTaxable: pricing.goodsTaxable,
@@ -145,8 +165,8 @@ export async function GET(req: NextRequest) {
       if (o.deliveryOrder) {
         o.deliveryOrder = sanitizeDeliveryOrder(o.deliveryOrder, {
           role: user.role,
-          isBuyer: type === 'buying',
-          isSupplier: type === 'selling',
+          isBuyer: isAdmin || type === 'buying',
+          isSupplier: isAdmin || type === 'selling',
         });
       }
       return o;

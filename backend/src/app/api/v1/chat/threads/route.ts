@@ -16,18 +16,24 @@ export async function GET(req: NextRequest) {
     await import('@/models/PurchaseOrder');
     await import('@/models/Company');
 
-    const myId = new mongoose.Types.ObjectId(user!.companyId);
+    const isAdmin = user!.role === 'PLATFORM_ADMIN';
+    const query = isAdmin
+      ? {}
+      : {
+          $or: [
+            { buyerCompanyId: new mongoose.Types.ObjectId(user!.companyId) },
+            { supplierCompanyId: new mongoose.Types.ObjectId(user!.companyId) },
+          ],
+        };
 
-    const threads = await CompanyChatThread.find({
-      $or: [{ buyerCompanyId: myId }, { supplierCompanyId: myId }],
-    })
+    const threads = await CompanyChatThread.find(query)
       .sort({ lastMessageAt: -1 })
       .populate('purchaseOrderId', 'poNumber status')
       .populate('buyerCompanyId', 'name')
       .populate('supplierCompanyId', 'name')
       .lean();
 
-    const data = threads.map((t: any) => serializeThread(t, user!.companyId));
+    const data = threads.map((t: any) => serializeThread(t, user!.companyId || ''));
 
     return NextResponse.json({ success: true, data });
   } catch (error: any) {

@@ -11,7 +11,7 @@ import {
   Building, LogOut, CheckCircle, Clock, ShoppingCart, Package,
   Plus, Users, FileText, ChevronRight, Truck, Info,
   Search, ShieldAlert, Star, RefreshCw, ArrowLeft,
-  Menu, X, User, Loader2, MessageSquare, Hexagon, Bell, ClipboardList, UserCheck
+  Menu, X, User, Loader2, MessageSquare, Hexagon, Bell, ClipboardList, UserCheck, ShieldCheck
 } from 'lucide-react';
 import { NotificationCenter, type NotificationItem } from '@/components/NotificationCenter';
 
@@ -644,16 +644,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
 
       if (activeTab === 'orders' && role !== 'TRANSPORTER') {
-        const resBuying = await fetch(`/api/v1/orders?type=buying&_t=${Date.now()}`, fetchOpts);
-        const resSelling = await fetch(`/api/v1/orders?type=selling&_t=${Date.now()}`, fetchOpts);
-        const dBuying = await resBuying.json();
-        const dSelling = await resSelling.json();
-        
-        const combined = [
-          ...(dBuying.data || []).map((o: any) => ({ ...o, flowType: 'Buying' })),
-          ...(dSelling.data || []).map((o: any) => ({ ...o, flowType: 'Selling' }))
-        ];
-        setOrders(combined);
+        if (user?.role === 'PLATFORM_ADMIN') {
+          const resAll = await fetch(`/api/v1/orders?type=all&_t=${Date.now()}`, fetchOpts);
+          const dAll = await resAll.json();
+          setOrders(dAll.data || []);
+        } else {
+          const resBuying = await fetch(`/api/v1/orders?type=buying&_t=${Date.now()}`, fetchOpts);
+          const resSelling = await fetch(`/api/v1/orders?type=selling&_t=${Date.now()}`, fetchOpts);
+          const dBuying = await resBuying.json();
+          const dSelling = await resSelling.json();
+          
+          const combined = [
+            ...(dBuying.data || []).map((o: any) => ({ ...o, flowType: 'Buying' })),
+            ...(dSelling.data || []).map((o: any) => ({ ...o, flowType: 'Selling' }))
+          ];
+          setOrders(combined);
+        }
       }
 
       if (activeTab === 'admin' && user?.role === 'PLATFORM_ADMIN') {
@@ -1165,11 +1171,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="md:hidden bg-[#F8FAFC] px-4 py-3 flex flex-col space-y-4 z-40 shrink-0 pt-safe">
         <div className="flex items-center justify-between gap-2 min-w-0">
           <div className="flex items-center space-x-2 min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={() => setShowMobileSidebar(true)}
+              className="p-1 -ml-1 text-slate-700 hover:text-slate-900 rounded-lg hover:bg-slate-200/60 transition-all cursor-pointer shrink-0"
+              title="Open Navigation Menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
             <img src="/logo.jpeg" alt="Company Logo" className="w-8 h-8 shrink-0 object-cover rounded-lg shadow-xs border border-slate-200/60" />
             <span className="font-extrabold text-[13px] text-[#001D4A] uppercase tracking-wider min-w-0 truncate">
-              {user?.company?.name || 'Company'}
+              {user?.company?.name || (user?.role === 'PLATFORM_ADMIN' ? 'Platform Admin' : 'Company')}
             </span>
-            {user?.company?.isActive !== false ? (
+            {user?.role === 'PLATFORM_ADMIN' ? (
+              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-[9px] font-bold shrink-0">
+                ADMIN
+              </span>
+            ) : user?.company?.isActive !== false ? (
               <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[9px] font-bold shrink-0 flex items-center gap-1">
                 <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div> ACTIVE
               </span>
@@ -1460,52 +1478,94 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Bottom Navigation Bar (Mobile) */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex justify-between items-center px-2 py-2 pb-safe z-50 shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.05)]">
-        {/* Tab 1: Market (Seller Only) */}
-        {!isBuyer && (
-          <button onClick={() => handleTabChange('marketplace')} className={`flex flex-col items-center gap-0.5 flex-1 outline-none focus:outline-none focus:ring-0 select-none ${activeTab === 'marketplace' ? activeMobileTabClass : 'text-slate-400'}`}>
-            <Search className="w-5 h-5" />
-            <span className="text-[9px] font-semibold">Market</span>
-            {activeTab === 'marketplace' ? <div className={`w-5 h-0.5 ${activeMobileIndicatorClass} rounded-full mt-0.5`}></div> : <div className="w-5 h-0.5 bg-transparent mt-0.5"></div>}
-          </button>
+        {user?.role === 'PLATFORM_ADMIN' ? (
+          <>
+            {/* Admin Tab */}
+            <button onClick={() => handleTabChange('admin')} className={`flex flex-col items-center gap-0.5 flex-1 outline-none focus:outline-none focus:ring-0 select-none ${activeTab === 'admin' ? activeMobileTabClass : 'text-slate-400'}`}>
+              <ShieldCheck className="w-5 h-5" />
+              <span className="text-[9px] font-semibold">Admin</span>
+              {activeTab === 'admin' ? <div className={`w-5 h-0.5 ${activeMobileIndicatorClass} rounded-full mt-0.5`}></div> : <div className="w-5 h-0.5 bg-transparent mt-0.5"></div>}
+            </button>
+
+            {/* Orders Tab */}
+            <button onClick={() => handleTabChange('orders')} className={`flex flex-col items-center gap-0.5 flex-1 outline-none focus:outline-none focus:ring-0 select-none ${activeTab === 'orders' ? activeMobileTabClass : 'text-slate-400'}`}>
+              <Package className="w-5 h-5" />
+              <span className="text-[9px] font-semibold">Orders</span>
+              {activeTab === 'orders' ? <div className={`w-5 h-0.5 ${activeMobileIndicatorClass} rounded-full mt-0.5`}></div> : <div className="w-5 h-0.5 bg-transparent mt-0.5"></div>}
+            </button>
+
+            {/* Chat Tab */}
+            <button onClick={() => handleTabChange('company_chat')} className={`flex flex-col items-center gap-0.5 flex-1 relative outline-none focus:outline-none focus:ring-0 select-none ${activeTab === 'company_chat' ? activeMobileTabClass : 'text-slate-400'}`}>
+              <MessageSquare className="w-5 h-5" />
+              {chatUnreadCount > 0 && <span className="absolute 0 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border border-white"></span>}
+              <span className="text-[9px] font-semibold">Chat</span>
+              {activeTab === 'company_chat' ? <div className={`w-5 h-0.5 ${activeMobileIndicatorClass} rounded-full mt-0.5`}></div> : <div className="w-5 h-0.5 bg-transparent mt-0.5"></div>}
+            </button>
+
+            {/* RFQs Tab */}
+            <button onClick={() => handleTabChange('my_rfqs')} className={`flex flex-col items-center gap-0.5 flex-1 outline-none focus:outline-none focus:ring-0 select-none ${activeTab === 'my_rfqs' ? activeMobileTabClass : 'text-slate-400'}`}>
+              <FileText className="w-5 h-5" />
+              <span className="text-[9px] font-semibold">RFQs</span>
+              {activeTab === 'my_rfqs' ? <div className={`w-5 h-0.5 ${activeMobileIndicatorClass} rounded-full mt-0.5`}></div> : <div className="w-5 h-0.5 bg-transparent mt-0.5"></div>}
+            </button>
+
+            {/* Profile Tab */}
+            <button onClick={() => handleTabChange('profile')} className={`flex flex-col items-center gap-0.5 flex-1 outline-none focus:outline-none focus:ring-0 select-none ${activeTab === 'profile' ? activeMobileTabClass : 'text-slate-400'}`}>
+              <User className="w-5 h-5" />
+              <span className="text-[9px] font-semibold">Profile</span>
+              {activeTab === 'profile' ? <div className={`w-5 h-0.5 ${activeMobileIndicatorClass} rounded-full mt-0.5`}></div> : <div className="w-5 h-0.5 bg-transparent mt-0.5"></div>}
+            </button>
+          </>
+        ) : (
+          <>
+            {/* Tab 1: Market (Seller Only) */}
+            {!isBuyer && (
+              <button onClick={() => handleTabChange('marketplace')} className={`flex flex-col items-center gap-0.5 flex-1 outline-none focus:outline-none focus:ring-0 select-none ${activeTab === 'marketplace' ? activeMobileTabClass : 'text-slate-400'}`}>
+                <Search className="w-5 h-5" />
+                <span className="text-[9px] font-semibold">Market</span>
+                {activeTab === 'marketplace' ? <div className={`w-5 h-0.5 ${activeMobileIndicatorClass} rounded-full mt-0.5`}></div> : <div className="w-5 h-0.5 bg-transparent mt-0.5"></div>}
+              </button>
+            )}
+
+            {/* Tab 2: PRs (Buyer Only - Purchase Requisitions) */}
+            {isBuyer && (
+              <button onClick={() => handleTabChange('prs')} className={`flex flex-col items-center gap-0.5 flex-1 outline-none focus:outline-none focus:ring-0 select-none ${activeTab === 'prs' ? activeMobileTabClass : 'text-slate-400'}`}>
+                <ClipboardList className="w-5 h-5" />
+                <span className="text-[9px] font-semibold">PRs</span>
+                {activeTab === 'prs' ? <div className={`w-5 h-0.5 ${activeMobileIndicatorClass} rounded-full mt-0.5`}></div> : <div className="w-5 h-0.5 bg-transparent mt-0.5"></div>}
+              </button>
+            )}
+
+            {/* Tab 3: RFQs (Buyer) / Bids (Seller) */}
+            <button onClick={() => handleTabChange('my_rfqs')} className={`flex flex-col items-center gap-0.5 flex-1 outline-none focus:outline-none focus:ring-0 select-none ${activeTab === 'my_rfqs' ? activeMobileTabClass : 'text-slate-400'}`}>
+              <FileText className="w-5 h-5" />
+              <span className="text-[9px] font-semibold">{isBuyer ? 'RFQs' : 'Bids'}</span>
+              {activeTab === 'my_rfqs' ? <div className={`w-5 h-0.5 ${activeMobileIndicatorClass} rounded-full mt-0.5`}></div> : <div className="w-5 h-0.5 bg-transparent mt-0.5"></div>}
+            </button>
+
+            {/* Tab 4: Orders (Both - ShoppingCart for Buyer, Package for Seller) */}
+            <button onClick={() => handleTabChange('orders')} className={`flex flex-col items-center gap-0.5 flex-1 outline-none focus:outline-none focus:ring-0 select-none ${activeTab === 'orders' ? activeMobileTabClass : 'text-slate-400'}`}>
+              {isBuyer ? <ShoppingCart className="w-5 h-5" /> : <Package className="w-5 h-5" />}
+              <span className="text-[9px] font-semibold">Orders</span>
+              {activeTab === 'orders' ? <div className={`w-5 h-0.5 ${activeMobileIndicatorClass} rounded-full mt-0.5`}></div> : <div className="w-5 h-0.5 bg-transparent mt-0.5"></div>}
+            </button>
+
+            {/* Tab 5: Chat (Both) */}
+            <button onClick={() => handleTabChange('company_chat')} className={`flex flex-col items-center gap-0.5 flex-1 relative outline-none focus:outline-none focus:ring-0 select-none ${activeTab === 'company_chat' ? activeMobileTabClass : 'text-slate-400'}`}>
+              <MessageSquare className="w-5 h-5" />
+              {chatUnreadCount > 0 && <span className="absolute 0 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border border-white"></span>}
+              <span className="text-[9px] font-semibold">Chat</span>
+              {activeTab === 'company_chat' ? <div className={`w-5 h-0.5 ${activeMobileIndicatorClass} rounded-full mt-0.5`}></div> : <div className="w-5 h-0.5 bg-transparent mt-0.5"></div>}
+            </button>
+
+            {/* Tab 6: Profile (Both) */}
+            <button onClick={() => handleTabChange('profile')} className={`flex flex-col items-center gap-0.5 flex-1 outline-none focus:outline-none focus:ring-0 select-none ${activeTab === 'profile' ? activeMobileTabClass : 'text-slate-400'}`}>
+              <User className="w-5 h-5" />
+              <span className="text-[9px] font-semibold">Profile</span>
+              {activeTab === 'profile' ? <div className={`w-5 h-0.5 ${activeMobileIndicatorClass} rounded-full mt-0.5`}></div> : <div className="w-5 h-0.5 bg-transparent mt-0.5"></div>}
+            </button>
+          </>
         )}
-
-        {/* Tab 2: PRs (Buyer Only - Purchase Requisitions) */}
-        {isBuyer && (
-          <button onClick={() => handleTabChange('prs')} className={`flex flex-col items-center gap-0.5 flex-1 outline-none focus:outline-none focus:ring-0 select-none ${activeTab === 'prs' ? activeMobileTabClass : 'text-slate-400'}`}>
-            <ClipboardList className="w-5 h-5" />
-            <span className="text-[9px] font-semibold">PRs</span>
-            {activeTab === 'prs' ? <div className={`w-5 h-0.5 ${activeMobileIndicatorClass} rounded-full mt-0.5`}></div> : <div className="w-5 h-0.5 bg-transparent mt-0.5"></div>}
-          </button>
-        )}
-
-        {/* Tab 3: RFQs (Buyer) / Bids (Seller) */}
-        <button onClick={() => handleTabChange('my_rfqs')} className={`flex flex-col items-center gap-0.5 flex-1 outline-none focus:outline-none focus:ring-0 select-none ${activeTab === 'my_rfqs' ? activeMobileTabClass : 'text-slate-400'}`}>
-          <FileText className="w-5 h-5" />
-          <span className="text-[9px] font-semibold">{isBuyer ? 'RFQs' : 'Bids'}</span>
-          {activeTab === 'my_rfqs' ? <div className={`w-5 h-0.5 ${activeMobileIndicatorClass} rounded-full mt-0.5`}></div> : <div className="w-5 h-0.5 bg-transparent mt-0.5"></div>}
-        </button>
-
-        {/* Tab 4: Orders (Both - ShoppingCart for Buyer, Package for Seller) */}
-        <button onClick={() => handleTabChange('orders')} className={`flex flex-col items-center gap-0.5 flex-1 outline-none focus:outline-none focus:ring-0 select-none ${activeTab === 'orders' ? activeMobileTabClass : 'text-slate-400'}`}>
-          {isBuyer ? <ShoppingCart className="w-5 h-5" /> : <Package className="w-5 h-5" />}
-          <span className="text-[9px] font-semibold">Orders</span>
-          {activeTab === 'orders' ? <div className={`w-5 h-0.5 ${activeMobileIndicatorClass} rounded-full mt-0.5`}></div> : <div className="w-5 h-0.5 bg-transparent mt-0.5"></div>}
-        </button>
-
-        {/* Tab 5: Chat (Both) */}
-        <button onClick={() => handleTabChange('company_chat')} className={`flex flex-col items-center gap-0.5 flex-1 relative outline-none focus:outline-none focus:ring-0 select-none ${activeTab === 'company_chat' ? activeMobileTabClass : 'text-slate-400'}`}>
-          <MessageSquare className="w-5 h-5" />
-          {chatUnreadCount > 0 && <span className="absolute 0 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border border-white"></span>}
-          <span className="text-[9px] font-semibold">Chat</span>
-          {activeTab === 'company_chat' ? <div className={`w-5 h-0.5 ${activeMobileIndicatorClass} rounded-full mt-0.5`}></div> : <div className="w-5 h-0.5 bg-transparent mt-0.5"></div>}
-        </button>
-
-        {/* Tab 6: Profile (Both) */}
-        <button onClick={() => handleTabChange('profile')} className={`flex flex-col items-center gap-0.5 flex-1 outline-none focus:outline-none focus:ring-0 select-none ${activeTab === 'profile' ? activeMobileTabClass : 'text-slate-400'}`}>
-          <User className="w-5 h-5" />
-          <span className="text-[9px] font-semibold">Profile</span>
-          {activeTab === 'profile' ? <div className={`w-5 h-0.5 ${activeMobileIndicatorClass} rounded-full mt-0.5`}></div> : <div className="w-5 h-0.5 bg-transparent mt-0.5"></div>}
-        </button>
       </div>
 
       {/* Publish RFQ Modal */}
