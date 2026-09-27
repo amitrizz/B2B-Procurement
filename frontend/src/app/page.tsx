@@ -39,24 +39,78 @@ export default function Home() {
   const [agreeTerms, setAgreeTerms] = useState(true);
   const router = useRouter();
 
+  const isJwtExpired = (tokenStr: string | null): boolean => {
+    if (!tokenStr) return true;
+    try {
+      const parts = tokenStr.split('.');
+      if (parts.length !== 3) return true;
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+      if (!payload.exp) return false;
+      return Date.now() >= payload.exp * 1000;
+    } catch {
+      return true;
+    }
+  };
+
   // Route guarding
   useEffect(() => {
     const token = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
-    if (token && storedUser) {
-      try {
-        const parsed = JSON.parse(storedUser);
-        router.push(getDefaultRouteForRole(parsed.role));
-      } catch {
-        router.push('/dashboard/rfqs');
-      }
-    } else {
+    const refreshToken = localStorage.getItem('refreshToken');
+
+    const cleanAndShowLogin = () => {
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
       setCheckingAuth(false);
       const savedEmail = localStorage.getItem(REMEMBER_EMAIL_KEY);
       if (savedEmail) {
         setEmail(savedEmail);
         setRememberMe(true);
       }
+    };
+
+    if (token && storedUser) {
+      if (isJwtExpired(token)) {
+        if (refreshToken && !isJwtExpired(refreshToken)) {
+          fetch('/api/v1/auth/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken })
+          })
+            .then(r => r.json())
+            .then(data => {
+              if (data.success && data.data?.accessToken) {
+                localStorage.setItem('token', data.data.accessToken);
+                if (data.data.refreshToken) {
+                  localStorage.setItem('refreshToken', data.data.refreshToken);
+                }
+                try {
+                  const parsed = JSON.parse(storedUser);
+                  router.push(getDefaultRouteForRole(parsed.role));
+                } catch {
+                  cleanAndShowLogin();
+                }
+              } else {
+                cleanAndShowLogin();
+              }
+            })
+            .catch(() => cleanAndShowLogin());
+          return;
+        }
+
+        cleanAndShowLogin();
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(storedUser);
+        router.push(getDefaultRouteForRole(parsed.role));
+      } catch {
+        cleanAndShowLogin();
+      }
+    } else {
+      cleanAndShowLogin();
     }
   }, [router]);
 

@@ -47,12 +47,7 @@ export default function RequisitionsTab({
   const [newComponentUnit, setNewComponentUnit] = useState('pcs');
   const [compLoading, setCompLoading] = useState(false);
 
-  // Category creation state
-  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState('');
-  const [newCategoryDesc, setNewCategoryDesc] = useState('');
-  const [catLoading, setCatLoading] = useState(false);
-  const [catalogSubTab, setCatalogSubTab] = useState<'components' | 'categories'>('components');
+
 
   // Custom Category Dropdown state
   const [isCatDropdownOpen, setIsCatDropdownOpen] = useState(false);
@@ -188,45 +183,7 @@ export default function RequisitionsTab({
     }
   };
 
-  const handleAddCategory = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCategoryName.trim()) {
-      showToast('Category name is required', 'error');
-      return;
-    }
 
-    setCatLoading(true);
-    try {
-      const res = await fetch('/api/v1/company/categories', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          categoryName: newCategoryName.trim(),
-          description: newCategoryDesc.trim()
-        })
-      });
-
-      const d = await res.json();
-      if (d.success) {
-        showToast('Category added to catalog!', 'success');
-        setShowAddCategoryModal(false);
-        const createdCat = newCategoryName.trim();
-        setNewCategoryName('');
-        setNewCategoryDesc('');
-        setSelectedCategory(createdCat);
-        fetchData();
-      } else {
-        showToast(d.message || 'Failed to add category', 'error');
-      }
-    } catch {
-      showToast('Failed to connect to server', 'error');
-    } finally {
-      setCatLoading(false);
-    }
-  };
 
   const handleOpenAddComponent = () => {
     setNewComponentCategory(allCategories[0] || 'General');
@@ -275,24 +232,7 @@ export default function RequisitionsTab({
     return true;
   });
 
-  // Category cards list for Categories sub-tab
-  const categoryCardsList = allCategories.map((catName: string) => {
-    const fromApi = companyCategories.find((c: any) => c.categoryName?.toLowerCase() === catName.toLowerCase());
-    const count = companyComponents.filter(
-      (c: any) => (c.category || c.categoryName || 'General').toLowerCase() === catName.toLowerCase()
-    ).length;
-    return {
-      name: catName,
-      description: fromApi?.description || `Standard category for ${catName.toLowerCase()} components and materials.`,
-      componentCount: count
-    };
-  });
 
-  const filteredCategoryCards = categoryCardsList.filter((cat) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return cat.name.toLowerCase().includes(q) || cat.description.toLowerCase().includes(q);
-  });
 
   return (
     <div className="space-y-4">
@@ -577,36 +517,8 @@ export default function RequisitionsTab({
             </div>
           </div>
 
-          {/* Sub-Tabs: Components vs Categories */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => { setCatalogSubTab('components'); setSearchQuery(''); }}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-all active:scale-95 ${
-                catalogSubTab === 'components'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'bg-white text-slate-600 border border-slate-200/90 hover:bg-slate-50'
-              }`}
-            >
-              <Package className="w-3.5 h-3.5" />
-              <span>Components ({companyComponents.length})</span>
-            </button>
-
-            <button
-              onClick={() => { setCatalogSubTab('categories'); setSearchQuery(''); }}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-all active:scale-95 ${
-                catalogSubTab === 'categories'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'bg-white text-slate-600 border border-slate-200/90 hover:bg-slate-50'
-              }`}
-            >
-              <Tag className="w-3.5 h-3.5" />
-              <span>Categories ({allCategories.length})</span>
-            </button>
-          </div>
-
-          {/* TAB 1: COMPONENTS VIEW */}
-          {catalogSubTab === 'components' && (
-            <div className="space-y-3">
+          {/* COMPONENTS CATALOG VIEW */}
+          <div className="space-y-3">
               {/* Category Dropdown Filter */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
@@ -851,108 +763,6 @@ export default function RequisitionsTab({
                 )}
               </div>
             </div>
-          )}
-
-          {/* TAB 2: CATEGORIES VIEW */}
-          {catalogSubTab === 'categories' && (
-            <div className="space-y-3">
-              {/* Search bar & Add Category Button */}
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Search categories by name or description..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-8 pr-8 py-2 text-xs bg-white border border-slate-200 rounded-xl placeholder:text-slate-400 text-[#001D4A] focus:outline-none focus:border-blue-500 shadow-2xs"
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-
-                {canManage && (
-                  <button
-                    type="button"
-                    onClick={() => setShowAddCategoryModal(true)}
-                    className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all active:scale-95 whitespace-nowrap"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Category</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Categories Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                {filteredCategoryCards.length === 0 ? (
-                  <div className="col-span-full py-12 text-center bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
-                    <Tag className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                    <p className="text-sm font-bold text-[#001D4A]">No categories found</p>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Create standard component categories to organize your internal catalog.
-                    </p>
-                    {canManage && (
-                      <button
-                        onClick={() => setShowAddCategoryModal(true)}
-                        className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
-                      >
-                        <Plus className="w-3.5 h-3.5" /> Add Category
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  filteredCategoryCards.map((cat) => (
-                    <div
-                      key={cat.name}
-                      className="bg-white rounded-xl p-3 sm:p-3.5 border border-slate-200/90 shadow-2xs hover:shadow-xs hover:border-blue-200 transition-all flex flex-col justify-between gap-3"
-                    >
-                      <div className="space-y-1.5">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
-                              <Tag className="w-3.5 h-3.5" />
-                            </div>
-                            <h4 className="font-bold text-sm text-[#001D4A] truncate">
-                              {cat.name}
-                            </h4>
-                          </div>
-                          <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-[10px] font-bold shrink-0 border border-blue-200/60">
-                            {cat.componentCount} {cat.componentCount === 1 ? 'item' : 'items'}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
-                          {cat.description}
-                        </p>
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-                        <span className="text-[10px] text-slate-400 font-medium">
-                          Category Catalog
-                        </span>
-                        <button
-                          onClick={() => {
-                            setSelectedCategory(cat.name);
-                            setCatalogSubTab('components');
-                          }}
-                          className="px-2.5 py-1 bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 font-bold rounded-lg text-[10px] transition-all flex items-center gap-1"
-                        >
-                          <span>View Components</span>
-                          <ChevronRight className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -1220,79 +1030,7 @@ export default function RequisitionsTab({
         </div>
       )}
 
-      {/* ---------------------------------------------------- */}
-      {/* Add Category Modal */}
-      {/* ---------------------------------------------------- */}
-      {showAddCategoryModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-5 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100 shrink-0">
-                  <Tag className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-base font-extrabold text-[#001D4A]">Add Category</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Create a category to group internal components</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowAddCategoryModal(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-all"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            <form onSubmit={handleAddCategory} className="space-y-3.5 pt-3.5">
-              <div>
-                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                  Category Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g., Raw Materials, Fasteners, Electrical, Hydraulics"
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-[#001D4A] placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-blue-500 transition-all font-medium"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                  Description <span className="text-slate-400 font-normal">(optional)</span>
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Brief description of this component category..."
-                  value={newCategoryDesc}
-                  onChange={(e) => setNewCategoryDesc(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-[#001D4A] placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-blue-500 transition-all font-medium resize-none"
-                />
-              </div>
-
-              <div className="flex gap-2.5 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowAddCategoryModal(false)}
-                  className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={catLoading}
-                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition-all shadow-xs flex items-center justify-center gap-1.5"
-                >
-                  {catLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>Save Category</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

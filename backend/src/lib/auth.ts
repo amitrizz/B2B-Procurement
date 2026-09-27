@@ -22,7 +22,7 @@ export function verifyPassword(password: string, storedHash: string): boolean {
 }
 
 export function generateAccessToken(payload: { userId: string; role: string; companyId: string | null }): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
 }
 
 export function generateRefreshToken(payload: { userId: string }): string {

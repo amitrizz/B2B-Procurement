@@ -248,8 +248,19 @@ export default function ProfileTab({ user, setUser, showToast }: ProfileTabProps
   };
 
   const handleLogout = () => {
-    localStorage.clear();
-    router.push('/');
+    try {
+      const rememberedEmail = localStorage.getItem('rememberedLoginEmail');
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      localStorage.removeItem('is_impersonating');
+      localStorage.removeItem('impersonated_company');
+      localStorage.removeItem('p2p_dashboard_mode');
+      if (rememberedEmail) {
+        localStorage.setItem('rememberedLoginEmail', rememberedEmail);
+      }
+    } catch {}
+    window.location.replace('/');
   };
 
   const handleUpdateCompany = async (e: React.FormEvent) => {

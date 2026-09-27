@@ -18,6 +18,39 @@ import { NotificationCenter, type NotificationItem } from '@/components/Notifica
 
 
 let refreshTokenPromise: Promise<any> | null = null;
+let isRedirectingToLogin = false;
+
+function isJwtExpired(tokenStr: string | null): boolean {
+  if (!tokenStr) return true;
+  try {
+    const parts = tokenStr.split('.');
+    if (parts.length !== 3) return true;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    if (!payload.exp) return false;
+    return Date.now() >= payload.exp * 1000;
+  } catch {
+    return true;
+  }
+}
+
+export function clearAuthAndRedirectToLogin() {
+  if (typeof window === 'undefined') return;
+  if (isRedirectingToLogin) return;
+  isRedirectingToLogin = true;
+  try {
+    const rememberedEmail = localStorage.getItem('rememberedLoginEmail');
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    localStorage.removeItem('is_impersonating');
+    localStorage.removeItem('impersonated_company');
+    localStorage.removeItem('p2p_dashboard_mode');
+    if (rememberedEmail) {
+      localStorage.setItem('rememberedLoginEmail', rememberedEmail);
+    }
+  } catch {}
+  window.location.replace('/');
+}
 
 export const DashboardContext = createContext<any>(null);
 
@@ -179,6 +212,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       // Save admin session backup before switching
       localStorage.setItem('admin_backup_token', token || '');
+      localStorage.setItem('admin_backup_refresh_token', localStorage.getItem('refreshToken') || '');
       localStorage.setItem('admin_backup_user', localStorage.getItem('user') || '');
       localStorage.setItem('is_impersonating', 'true');
       localStorage.setItem('impersonated_company', JSON.stringify(company));
@@ -206,26 +240,44 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const handleExitImpersonation = async () => {
     try {
       const targetEmail = localStorage.getItem('impersonated_target_email') || '';
-      if (targetEmail) {
-        await fetch('/api/v1/admin/impersonate/exit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ targetEmail }),
-        }).catch(() => {});
-      }
+      const backupUserStr = localStorage.getItem('admin_backup_user');
+      let adminUserId = '';
+      try {
+        if (backupUserStr) {
+          const parsed = JSON.parse(backupUserStr);
+          adminUserId = parsed.id || parsed._id;
+        }
+      } catch {}
 
-      const backupToken = localStorage.getItem('admin_backup_token');
-      const backupUser = localStorage.getItem('admin_backup_user');
+      const res = await fetch('/api/v1/admin/impersonate/exit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetEmail, adminUserId }),
+      });
+      const data = await res.json();
 
-      if (backupToken && backupUser) {
-        localStorage.setItem('token', backupToken);
-        localStorage.setItem('user', backupUser);
-        try {
-          setUser(JSON.parse(backupUser));
-        } catch {}
+      if (data.success && data.data?.accessToken) {
+        localStorage.setItem('token', data.data.accessToken);
+        localStorage.setItem('refreshToken', data.data.refreshToken);
+        localStorage.setItem('user', JSON.stringify(data.data.user));
+        setUser(data.data.user);
+      } else {
+        const backupToken = localStorage.getItem('admin_backup_token');
+        const backupRefreshToken = localStorage.getItem('admin_backup_refresh_token');
+        const backupUser = localStorage.getItem('admin_backup_user');
+
+        if (backupToken) localStorage.setItem('token', backupToken);
+        if (backupRefreshToken) localStorage.setItem('refreshToken', backupRefreshToken);
+        if (backupUser) {
+          localStorage.setItem('user', backupUser);
+          try {
+            setUser(JSON.parse(backupUser));
+          } catch {}
+        }
       }
 
       localStorage.removeItem('admin_backup_token');
+      localStorage.removeItem('admin_backup_refresh_token');
       localStorage.removeItem('admin_backup_user');
       localStorage.removeItem('is_impersonating');
       localStorage.removeItem('impersonated_company');
@@ -235,7 +287,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       setImpersonatedCompany(null);
 
       showToast('Exited impersonation. Returned to Platform Admin.', 'info');
-      router.push('/dashboard/admin');
+      // Full hard reload to /dashboard/admin to ensure all sockets, cached roles, and headers reset
+      window.location.replace('/dashboard/admin');
     } catch {
       showToast('Error exiting impersonation', 'error');
     }
@@ -342,6 +395,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       return;
     }
 
+    // Do NOT fetch /company/me for Platform Admin unless currently impersonating a company
+    if (parsed.role === 'PLATFORM_ADMIN' && localStorage.getItem('is_impersonating') !== 'true') {
+      return;
+    }
+
     const companyId = getCompanyIdFromUser(parsed);
     if (!companyId) return;
 
@@ -388,62 +446,92 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     window.fetch = async (...args) => {
       const res = await originalFetch(...args);
       if (res.status === 401) {
+        // Prevent infinite retry loop if retry also failed with 401
+        if ((args[1] as any)?._isRetry) {
+          clearAuthAndRedirectToLogin();
+          return res;
+        }
+
+        const urlStr = args[0]?.toString() || '';
+        if (urlStr.includes('/api/v1/auth/refresh')) {
+          clearAuthAndRedirectToLogin();
+          return res;
+        }
+
         const refreshToken = localStorage.getItem('refreshToken');
-        if (refreshToken && !args[0]?.toString().includes('/api/v1/auth/refresh')) {
+        if (refreshToken && !isJwtExpired(refreshToken)) {
           try {
             if (!refreshTokenPromise) {
               refreshTokenPromise = originalFetch('/api/v1/auth/refresh', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ refreshToken })
-              }).then(res => res.json()).finally(() => {
-                refreshTokenPromise = null;
-              });
+              })
+                .then(r => r.json())
+                .catch(() => ({ success: false }))
+                .finally(() => {
+                  refreshTokenPromise = null;
+                });
             }
             
             const refreshData = await refreshTokenPromise;
             
-            if (refreshData.success && refreshData.data?.accessToken) {
+            if (refreshData?.success && refreshData.data?.accessToken) {
               localStorage.setItem('token', refreshData.data.accessToken);
               if (refreshData.data.refreshToken) {
                 localStorage.setItem('refreshToken', refreshData.data.refreshToken);
               }
-              // Retry the original request with the new token
+              // Retry the original request with the new token, tagged with _isRetry
               const newArgs = [...args] as any;
-              if (newArgs[1] && newArgs[1].headers) {
-                if (newArgs[1].headers instanceof Headers) {
-                  newArgs[1].headers.set('Authorization', `Bearer ${refreshData.data.accessToken}`);
-                } else if (typeof newArgs[1].headers === 'object') {
-                  newArgs[1].headers['Authorization'] = `Bearer ${refreshData.data.accessToken}`;
+              const opts = { ...(newArgs[1] || {}), _isRetry: true };
+              if (opts.headers) {
+                if (opts.headers instanceof Headers) {
+                  opts.headers.set('Authorization', `Bearer ${refreshData.data.accessToken}`);
+                } else if (typeof opts.headers === 'object') {
+                  opts.headers['Authorization'] = `Bearer ${refreshData.data.accessToken}`;
                 }
-              } else if (!newArgs[1]) {
-                newArgs[1] = { headers: { 'Authorization': `Bearer ${refreshData.data.accessToken}` } };
+              } else {
+                opts.headers = { 'Authorization': `Bearer ${refreshData.data.accessToken}` };
               }
-              return originalFetch(newArgs[0] as RequestInfo | URL, newArgs[1] as RequestInit);
+              newArgs[1] = opts;
+              const retryRes = await originalFetch(newArgs[0] as RequestInfo | URL, newArgs[1] as RequestInit);
+              if (retryRes.status === 401) {
+                clearAuthAndRedirectToLogin();
+              }
+              return retryRes;
             }
           } catch (e) {
             console.error('Failed to refresh token', e);
           }
         }
         
-        localStorage.clear();
-        router.push('/');
+        clearAuthAndRedirectToLogin();
       }
       return res;
     };
     return () => {
       window.fetch = originalFetch;
     };
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     const token = localStorage.getItem('token');
+    const refreshToken = localStorage.getItem('refreshToken');
+
     if (!storedUser || !token) {
       setCheckingAuth(false);
-      router.push('/');
+      clearAuthAndRedirectToLogin();
       return;
     }
+
+    if (isJwtExpired(token) && (!refreshToken || isJwtExpired(refreshToken))) {
+      setCheckingAuth(false);
+      clearAuthAndRedirectToLogin();
+      return;
+    }
+
+    try {
       const parsed = JSON.parse(storedUser);
       setUser(parsed);
       setModeState(readDashboardMode(getCompanyIdFromUser(parsed)));
@@ -455,10 +543,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           const comp = JSON.parse(localStorage.getItem('impersonated_company') || '{}');
           setImpersonatedCompany(comp);
         } catch {}
+      } else {
+        setIsImpersonating(false);
+        setImpersonatedCompany(null);
+        localStorage.removeItem('impersonated_company');
+        localStorage.removeItem('impersonated_target_email');
       }
 
       setCheckingAuth(false);
-  }, [router]);
+    } catch {
+      clearAuthAndRedirectToLogin();
+    }
+  }, []);
 
   // Redirect legacy admin users route into unified admin portal
   useEffect(() => {
@@ -715,8 +811,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   const handleLogout = () => {
-    localStorage.clear();
-    router.push('/');
+    clearAuthAndRedirectToLogin();
   };
 
   // RFQ Creation & Editing
